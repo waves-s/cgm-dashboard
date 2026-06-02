@@ -106,6 +106,44 @@ div[data-testid="metric-container"] {
 hr { border-top: 1px solid #e0e0e0; margin: 16px 0; }
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
+
+/* ── Compact Sidebar ── */
+section[data-testid="stSidebar"] > div:first-child {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+}
+section[data-testid="stSidebar"] .stMarkdown p,
+section[data-testid="stSidebar"] .stMarkdown h3 {
+    margin-bottom: 2px !important;
+    margin-top: 2px !important;
+}
+section[data-testid="stSidebar"] .stMarkdown h3 {
+    font-size: 0.85rem !important;
+}
+section[data-testid="stSidebar"] .stRadio > label,
+section[data-testid="stSidebar"] .stSelectbox > label,
+section[data-testid="stSidebar"] .stNumberInput > label,
+section[data-testid="stSidebar"] .stSlider > label {
+    font-size: 0.78rem !important;
+    margin-bottom: 0px !important;
+}
+section[data-testid="stSidebar"] .stRadio,
+section[data-testid="stSidebar"] .stSelectbox,
+section[data-testid="stSidebar"] .stNumberInput,
+section[data-testid="stSidebar"] .stSlider,
+section[data-testid="stSidebar"] .stButton {
+    margin-bottom: 4px !important;
+    margin-top: 0px !important;
+}
+section[data-testid="stSidebar"] hr {
+    margin: 6px 0 !important;
+}
+section[data-testid="stSidebar"] .stButton > button {
+    padding: 4px 8px !important;
+    font-size: 0.78rem !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
