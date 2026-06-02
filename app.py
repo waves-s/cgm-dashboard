@@ -3,7 +3,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta, timezone
-import time
+import json
+import io
+from pathlib import Path
 from pylibrelinkup import PyLibreLinkUp, APIUrl
 from pylibrelinkup.exceptions import (
     AuthenticationError, LLUAPIRateLimitError, PrivacyPolicyError, TermsOfUseError, RedirectError
@@ -27,12 +29,10 @@ st.markdown("""
     padding-bottom: 0.5rem !important;
     max-width: 100% !important;
 }
-/* Remove the large top gap Streamlit adds above the first element */
 .main .block-container > div:first-child {
     margin-top: 0 !important;
     padding-top: 0 !important;
 }
-/* Hide the Streamlit deploy button / hamburger header bar */
 header[data-testid="stHeader"] {
     height: 0 !important;
     min-height: 0 !important;
@@ -66,62 +66,6 @@ div[data-testid="metric-container"] {
     border-radius: 12px;
     padding: 12px 16px;
     text-align: center;
-}
-/* ── Chart control bar ── */
-.ctrl-bar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background: #f8f9fa;
-    border: 1px solid #e0e0e0;
-    border-radius: 14px;
-    padding: 10px 18px;
-    margin-bottom: 12px;
-}
-.ctrl-period {
-    font-size: 15px;
-    font-weight: 700;
-    color: #1a1a1a;
-    white-space: nowrap;
-    flex: 1;
-}
-.ctrl-period span {
-    font-size: 12px;
-    font-weight: 400;
-    color: #888;
-    margin-left: 6px;
-}
-/* ── Zoom pill ── */
-.zoom-bar {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    background: #f0f4ff;
-    border: 1px solid #c5d3f5;
-    border-radius: 12px;
-    padding: 8px 16px;
-    margin-bottom: 10px;
-}
-.zoom-label {
-    font-size: 12px;
-    font-weight: 600;
-    color: #555;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    white-space: nowrap;
-}
-.zoom-value {
-    font-size: 26px;
-    font-weight: 900;
-    color: #1a73e8;
-    line-height: 1;
-    min-width: 52px;
-    text-align: right;
-}
-.zoom-sub {
-    font-size: 11px;
-    color: #888;
-    margin-top: 1px;
 }
 hr { border-top: 1px solid #e0e0e0; margin: 16px 0; }
 #MainMenu {visibility: hidden;}
@@ -168,7 +112,8 @@ section[data-testid="stSidebar"] .stButton > button {
 """, unsafe_allow_html=True)
 
 # ─── Constants ────────────────────────────────────────────────────────────────
-MG_TO_MMOL = 0.0555   # 1 mg/dL × 0.0555 = mmol/L
+MG_TO_MMOL  = 0.0555
+CACHE_FILE  = Path(__file__).parent / "cache.json"
 
 # ─── Session State Initialization ─────────────────────────────────────────────
 for key, default in {
@@ -180,9 +125,9 @@ for key, default in {
     "graph_data": [],
     "logbook_data": [],
     "latest_reading": None,
-    "nav_offset_days": 0,   # 0 = today/latest, negative = days back
-    "nav_view": "day",      # "day" or "week"
-    "history_data": [],     # extended history from glucoseHistory endpoint
+    "nav_offset_days": 0,
+    "nav_view": "day",
+    "cache_df": None,         # Full merged DataFrame from cache.json
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -203,7 +148,6 @@ def mmol_to_mg(v):
     return round(v / MG_TO_MMOL, 0)
 
 def format_value(v_mg, unit):
-    """Format a mg/dL value for display in the chosen unit."""
     if unit == "mmol/L":
         return f"{mg_to_mmol(v_mg):.1f}"
     return f"{v_mg:.0f}"
@@ -259,43 +203,12 @@ def fetch_data(patient):
         st.error(f"Error fetching data: {e}")
         return False
 
-def fetch_extended_history(num_periods: int = 5, period_days: int = 14):
-    """Fetch extended glucose history via the glucoseHistory endpoint.
-    Returns a list of dicts with 'timestamp' and 'value_in_mg_per_dl'.
-    """
-    try:
-        api = st.session_state.api
-        import requests as _req
-        url = f"{api.api_url}/glucoseHistory?numPeriods={num_periods}&period={period_days}"
-        headers = api._get_headers()
-        r = _req.get(url, headers=headers)
-        r.raise_for_status()
-        data = r.json()
-        rows = []
-        for period in data.get("data", {}).get("periods", []):
-            for entry in period.get("data", []):
-                ts_raw = entry.get("FactoryTimestamp") or entry.get("Timestamp")
-                val    = entry.get("Value")  # mg/dL in this endpoint
-                if ts_raw and val is not None:
-                    rows.append({"timestamp": ts_raw, "value_in_mg_per_dl": float(val)})
-        st.session_state.history_data = rows
-        return True, len(rows)
-    except Exception as e:
-        return False, str(e)
-
-
 def readings_to_df(readings):
     if not readings:
         return pd.DataFrame()
     rows = []
     for r in readings:
-        # Always use value_in_mg_per_dl as the authoritative mg/dL source.
-        # The 'value' field reflects the account's display unit (mmol/L for CA accounts)
-        # so it must NOT be used as mg/dL.
         mg_val = r.value_in_mg_per_dl if r.value_in_mg_per_dl else r.value
-        # Use factory_timestamp (UTC-tagged) so timezone conversion is correct.
-        # 'timestamp' is a naive local datetime — treating it as UTC shifts readings
-        # by the user's UTC offset, collapsing multi-day data into a single day.
         ts = r.factory_timestamp if hasattr(r, 'factory_timestamp') and r.factory_timestamp else r.timestamp
         rows.append({
             "Timestamp": ts,
@@ -304,24 +217,149 @@ def readings_to_df(readings):
             "Is Low":  r.is_low,
         })
     df = pd.DataFrame(rows)
-    # factory_timestamp is UTC-aware; convert to UTC then drop tz for naive comparison
     df["Timestamp"] = pd.to_datetime(df["Timestamp"], utc=True).dt.tz_convert("UTC").dt.tz_localize(None)
     df["Glucose_mmol"] = (df["Glucose_mg"] * MG_TO_MMOL).round(1)
     return df.sort_values("Timestamp")
 
-
-def history_to_df(history_rows):
-    """Convert extended history dicts to a DataFrame compatible with readings_to_df output."""
-    if not history_rows:
+# ─── Cache Functions ───────────────────────────────────────────────────────────
+def load_cache_df() -> pd.DataFrame:
+    """Load cache.json and return as a DataFrame. Returns empty DataFrame if not found."""
+    if not CACHE_FILE.exists():
         return pd.DataFrame()
-    df = pd.DataFrame(history_rows)
-    df.rename(columns={"timestamp": "Timestamp", "value_in_mg_per_dl": "Glucose_mg"}, inplace=True)
-    df["Timestamp"] = pd.to_datetime(df["Timestamp"], utc=True, errors="coerce").dt.tz_localize(None)
-    df = df.dropna(subset=["Timestamp", "Glucose_mg"])
-    df["Glucose_mmol"] = (df["Glucose_mg"] * MG_TO_MMOL).round(1)
-    df["Is High"] = False
-    df["Is Low"]  = False
-    return df.sort_values("Timestamp")
+    try:
+        with open(CACHE_FILE, "r") as f:
+            data = json.load(f)
+        readings = data.get("readings", [])
+        if not readings:
+            return pd.DataFrame()
+        df = pd.DataFrame(readings)
+        df.rename(columns={"timestamp": "Timestamp", "value_mg_dl": "Glucose_mg"}, inplace=True)
+        df["Timestamp"] = pd.to_datetime(df["Timestamp"], utc=True, errors="coerce").dt.tz_localize(None)
+        df = df.dropna(subset=["Timestamp", "Glucose_mg"])
+        df["Glucose_mg"] = pd.to_numeric(df["Glucose_mg"], errors="coerce")
+        df = df.dropna(subset=["Glucose_mg"])
+        df["Glucose_mmol"] = (df["Glucose_mg"] * MG_TO_MMOL).round(1)
+        df["Is High"] = False
+        df["Is Low"]  = False
+        return df.drop_duplicates("Timestamp").sort_values("Timestamp").reset_index(drop=True)
+    except Exception as e:
+        st.warning(f"Could not load cache: {e}")
+        return pd.DataFrame()
+
+def save_cache(df: pd.DataFrame):
+    """Save a DataFrame back to cache.json."""
+    try:
+        readings = []
+        for _, row in df.iterrows():
+            readings.append({
+                "timestamp": row["Timestamp"].isoformat(),
+                "value_mg_dl": float(row["Glucose_mg"]),
+                "trend": row.get("trend", "STABLE"),
+                "source": row.get("source", "csv"),
+            })
+        data = {
+            "readings": readings,
+            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "source": "merged",
+        }
+        with open(CACHE_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+        return True
+    except Exception as e:
+        st.error(f"Could not save cache: {e}")
+        return False
+
+def parse_libreview_csv(uploaded_file) -> pd.DataFrame:
+    """
+    Parse a LibreView CSV export file.
+    LibreView CSV has metadata rows at the top; glucose data starts after the header row
+    containing 'Device Timestamp'.
+    """
+    try:
+        content = uploaded_file.read().decode("utf-8", errors="replace")
+        lines = content.splitlines()
+
+        # Find the header row (contains 'Device Timestamp')
+        header_idx = None
+        for i, line in enumerate(lines):
+            if "Device Timestamp" in line or "device timestamp" in line.lower():
+                header_idx = i
+                break
+
+        if header_idx is None:
+            return pd.DataFrame(), "Could not find 'Device Timestamp' column in CSV. Please use a LibreView export file."
+
+        # Parse from the header row onwards
+        csv_content = "\n".join(lines[header_idx:])
+        df = pd.read_csv(io.StringIO(csv_content))
+
+        # Normalise column names
+        df.columns = [c.strip() for c in df.columns]
+
+        # Find timestamp column
+        ts_col = next((c for c in df.columns if "timestamp" in c.lower()), None)
+        if ts_col is None:
+            return pd.DataFrame(), "Could not find timestamp column."
+
+        # Find glucose value column — LibreView uses 'Historic Glucose mg/dL' or 'Historic Glucose mmol/L'
+        # or 'Scan Glucose mg/dL' / 'Scan Glucose mmol/L'
+        glucose_col_mg   = next((c for c in df.columns if "historic glucose mg" in c.lower() or "scan glucose mg" in c.lower()), None)
+        glucose_col_mmol = next((c for c in df.columns if "historic glucose mmol" in c.lower() or "scan glucose mmol" in c.lower()), None)
+
+        if glucose_col_mg is None and glucose_col_mmol is None:
+            # Try generic fallback
+            glucose_col_mg = next((c for c in df.columns if "glucose" in c.lower() and "mg" in c.lower()), None)
+            glucose_col_mmol = next((c for c in df.columns if "glucose" in c.lower() and "mmol" in c.lower()), None)
+
+        if glucose_col_mg is None and glucose_col_mmol is None:
+            return pd.DataFrame(), f"Could not find glucose column. Available columns: {list(df.columns)}"
+
+        # Build result DataFrame
+        result = pd.DataFrame()
+        result["Timestamp"] = pd.to_datetime(df[ts_col], errors="coerce", dayfirst=False)
+        result = result.dropna(subset=["Timestamp"])
+
+        if glucose_col_mg:
+            result["Glucose_mg"] = pd.to_numeric(df[glucose_col_mg], errors="coerce")
+        else:
+            # Convert mmol/L to mg/dL
+            result["Glucose_mg"] = pd.to_numeric(df[glucose_col_mmol], errors="coerce") / MG_TO_MMOL
+
+        result = result.dropna(subset=["Glucose_mg"])
+        result["Glucose_mmol"] = (result["Glucose_mg"] * MG_TO_MMOL).round(1)
+        result["Is High"] = False
+        result["Is Low"]  = False
+        result["source"]  = "csv"
+        result["trend"]   = "STABLE"
+
+        return result.drop_duplicates("Timestamp").sort_values("Timestamp").reset_index(drop=True), None
+
+    except Exception as e:
+        return pd.DataFrame(), f"Error parsing CSV: {e}"
+
+def merge_with_cache(new_df: pd.DataFrame, existing_df: pd.DataFrame) -> pd.DataFrame:
+    """Merge two DataFrames, deduplicate by Timestamp, sort by time."""
+    if new_df.empty:
+        return existing_df
+    if existing_df.empty:
+        return new_df
+    combined = pd.concat([existing_df, new_df], ignore_index=True)
+    combined = combined.drop_duplicates("Timestamp").sort_values("Timestamp").reset_index(drop=True)
+    return combined
+
+def get_full_df() -> pd.DataFrame:
+    """
+    Return the full merged DataFrame:
+    cache.json (background-polled + CSV history) + current live session data.
+    """
+    # Load from cache file (background poller writes here every 5 min)
+    cache_df = load_cache_df()
+
+    # Also merge current live session data
+    live_readings = list(st.session_state.graph_data or []) + list(st.session_state.logbook_data or [])
+    live_df = readings_to_df(live_readings)
+
+    return merge_with_cache(live_df, cache_df)
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -334,7 +372,7 @@ with st.sidebar:
         password = st.text_input("Password", type="password")
         region   = st.selectbox(
             "Region",
-            options=["US", "EU", "EU2", "CA", "AU", "AP", "AE", "DE", "FR", "JP", "LA", "RU"],
+            options=["US", "EU", "EU2", "CA", "AU", "AE", "DE", "FR", "JP", "RU"],
             index=0,
             help="The app will auto-detect and redirect to your correct regional server."
         )
@@ -353,7 +391,6 @@ with st.sidebar:
     else:
         st.success("✅ Authenticated")
 
-        # Patient selector
         if len(st.session_state.patients) > 1:
             patient_names = [f"{p.first_name} {p.last_name}" for p in st.session_state.patients]
             idx = st.selectbox("Patient", range(len(patient_names)), format_func=lambda i: patient_names[i])
@@ -377,127 +414,138 @@ with st.sidebar:
         if unit_choice == "mmol/L":
             low_default  = round(70  * MG_TO_MMOL, 1)
             high_default = round(180 * MG_TO_MMOL, 1)
-            low_mmol  = st.number_input("Low threshold (mmol/L)",  min_value=1.0, max_value=10.0, value=low_default,  step=0.1, format="%.1f")
-            high_mmol = st.number_input("High threshold (mmol/L)", min_value=5.0, max_value=25.0, value=high_default, step=0.1, format="%.1f")
+            low_mmol  = st.number_input("Low (mmol/L)",  min_value=1.0, max_value=10.0, value=low_default,  step=0.1, format="%.1f")
+            high_mmol = st.number_input("High (mmol/L)", min_value=5.0, max_value=25.0, value=high_default, step=0.1, format="%.1f")
             target_low_mg  = round(low_mmol  / MG_TO_MMOL)
             target_high_mg = round(high_mmol / MG_TO_MMOL)
             st.caption(f"≈ {target_low_mg:.0f} – {target_high_mg:.0f} mg/dL")
         else:
-            target_low_mg  = st.number_input("Low threshold (mg/dL)",  min_value=40,  max_value=180, value=70,  step=1)
-            target_high_mg = st.number_input("High threshold (mg/dL)", min_value=100, max_value=400, value=180, step=1)
-            if unit_choice == "Both":
-                st.caption(f"≈ {mg_to_mmol(target_low_mg):.1f} – {mg_to_mmol(target_high_mg):.1f} mmol/L")
+            target_low_mg  = st.number_input("Low (mg/dL)",  min_value=40,  max_value=180, value=70,  step=1)
+            target_high_mg = st.number_input("High (mg/dL)", min_value=100, max_value=400, value=180, step=1)
+            st.caption(f"≈ {mg_to_mmol(target_low_mg):.1f} – {mg_to_mmol(target_high_mg):.1f} mmol/L")
 
         st.markdown("---")
 
         # ── Refresh ────────────────────────────────────────────────────────────
         st.markdown("### 🔄 Refresh")
-        refresh_min = st.selectbox(
+        refresh_interval = st.selectbox(
             "Auto-refresh every",
             options=[1, 5, 10, 15, 30],
             index=1,
             format_func=lambda x: f"{x} min"
         )
-        if st.button("Refresh Now", use_container_width=True):
-            with st.spinner("Fetching…"):
-                fetch_data(st.session_state.selected_patient)
-            st.rerun()
+        if st.button("🔄 Refresh Now", use_container_width=True):
+            if st.session_state.selected_patient:
+                with st.spinner("Fetching latest readings…"):
+                    fetch_data(st.session_state.selected_patient)
+                st.rerun()
 
         if st.session_state.last_update:
             st.caption(f"Last fetched: {st.session_state.last_update.strftime('%H:%M:%S')}")
 
+        # Show cache status
+        cache_df_info = load_cache_df()
+        if not cache_df_info.empty:
+            oldest = cache_df_info["Timestamp"].min().strftime("%b %d, %Y")
+            newest = cache_df_info["Timestamp"].max().strftime("%b %d %H:%M")
+            st.caption(f"📦 Cache: {len(cache_df_info):,} readings\n{oldest} → {newest}")
+
         st.markdown("---")
 
-        # ── Extended History ───────────────────────────────────────────────────
-        st.markdown("### 📅 Extended History")
-        st.caption("Load up to 70+ days of historical data via the LibreView API.")
-        hist_periods = st.slider("Periods × 14 days", min_value=1, max_value=10, value=5, step=1,
-                                  help="Each period = 14 days. 5 periods = ~70 days.")
-        if st.button("Load Extended History", use_container_width=True):
-            with st.spinner(f"Fetching {hist_periods * 14} days of history…"):
-                ok, result = fetch_extended_history(num_periods=hist_periods, period_days=14)
-            if ok:
-                st.success(f"Loaded {result:,} readings ({hist_periods * 14} days)")
-                st.rerun()
+        # ── Historical Data (CSV Upload) ───────────────────────────────────────
+        st.markdown("### 📁 Historical Data")
+        st.caption("Upload a LibreView CSV export to seed full history. Only needed once — the app caches it automatically.")
+
+        uploaded = st.file_uploader(
+            "Upload LibreView CSV",
+            type=["csv"],
+            label_visibility="collapsed",
+            help="Download from LibreView website → Glucose History → Download glucose data"
+        )
+        if uploaded is not None:
+            with st.spinner("Parsing CSV…"):
+                csv_df, err = parse_libreview_csv(uploaded)
+            if err:
+                st.error(f"CSV error: {err}")
+            elif csv_df.empty:
+                st.warning("No glucose readings found in CSV.")
             else:
-                st.warning(f"Extended history unavailable: {result}")
-        if st.session_state.history_data:
-            st.caption(f"📂 {len(st.session_state.history_data):,} extended readings loaded")
+                existing = load_cache_df()
+                merged   = merge_with_cache(csv_df, existing)
+                if save_cache(merged):
+                    added = len(merged) - len(existing)
+                    st.success(f"✅ Added {added:,} readings from CSV ({len(merged):,} total in cache).")
+                    st.rerun()
 
         st.markdown("---")
-        if st.button("Logout", use_container_width=True):
+
+        # ── Logout ─────────────────────────────────────────────────────────────
+        if st.button("🚪 Logout", use_container_width=True):
             for k in ["api", "authenticated", "patients", "selected_patient",
-                      "last_update", "graph_data", "logbook_data", "latest_reading"]:
-                st.session_state[k] = None if k != "patients" else []
+                      "latest_reading", "graph_data", "logbook_data", "last_update"]:
+                st.session_state[k] = None if k in ["api", "selected_patient", "latest_reading", "last_update"] else []
             st.session_state.authenticated = False
             st.rerun()
 
-# ─── Main Content ─────────────────────────────────────────────────────────────
-if not st.session_state.authenticated:
-    st.title("📊 Continuous Glucose Monitor Dashboard")
-    st.info("👈 Please log in using your LibreView credentials in the sidebar.")
-    st.markdown("""
-**What you'll see after logging in:**
+# ─── Auto-refresh ─────────────────────────────────────────────────────────────
+if st.session_state.authenticated and st.session_state.selected_patient:
+    if st.session_state.last_update is None:
+        with st.spinner("Loading latest readings…"):
+            fetch_data(st.session_state.selected_patient)
+    else:
+        elapsed = (datetime.now() - st.session_state.last_update).total_seconds()
+        if elapsed >= refresh_interval * 60:
+            fetch_data(st.session_state.selected_patient)
 
-| Feature | Description |
-|---|---|
-| Live Reading | Current glucose value with trend arrow and status |
-| Units Toggle | Switch between mg/dL, mmol/L, or show both |
-| Custom Target Range | Set your own Low / High thresholds |
-| Trend Chart | Interactive 12-hour glucose graph |
-| Reading History | Scrollable table of all recent readings |
-| Statistics | Average, min, max, time in range |
-    """)
+# ─── Main Content ─────────────────────────────────────────────────────────────
+st.markdown("# 📊 CGM Dashboard")
+st.markdown("---")
+
+if not st.session_state.authenticated:
+    st.info("👈 Please log in using the sidebar to view your glucose data.")
+    # Show cache status even when not logged in
+    cache_df_preview = load_cache_df()
+    if not cache_df_preview.empty:
+        st.success(f"📦 Background cache active: {len(cache_df_preview):,} readings stored "
+                   f"({cache_df_preview['Timestamp'].min().strftime('%b %d')} – "
+                   f"{cache_df_preview['Timestamp'].max().strftime('%b %d, %Y')}). "
+                   f"Log in to view your data.")
     st.stop()
 
-# ─── Auto-fetch on first load ─────────────────────────────────────────────────
-if st.session_state.latest_reading is None and st.session_state.selected_patient:
-    with st.spinner("Loading your glucose data…"):
-        fetch_data(st.session_state.selected_patient)
-
-# ─── Auto-refresh ─────────────────────────────────────────────────────────────
-if st.session_state.authenticated and st.session_state.last_update:
-    elapsed = (datetime.now() - st.session_state.last_update).total_seconds()
-    if elapsed >= refresh_min * 60:
-        fetch_data(st.session_state.selected_patient)
-        st.rerun()
-
-# ─── Dashboard Header ─────────────────────────────────────────────────────────
-patient = st.session_state.selected_patient
-patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
-st.title(f"📊 {patient_name}'s Glucose Dashboard")
-
+# ─── Latest Reading Header ────────────────────────────────────────────────────
 latest = st.session_state.latest_reading
 if latest is None:
-    st.warning("No data available. Click **Refresh Now** in the sidebar.")
+    st.info("No data yet. Click 'Refresh Now' in the sidebar.")
     st.stop()
 
-# ─── Current Reading Banner ───────────────────────────────────────────────────
-# Use value_in_mg_per_dl as the authoritative base for all calculations
-latest_mg = latest.value_in_mg_per_dl if latest.value_in_mg_per_dl else latest.value
+# Get the latest glucose value
+latest_mg = float(latest.value_in_mg_per_dl if latest.value_in_mg_per_dl else latest.value)
+trend_obj  = latest.trend_arrow if hasattr(latest, 'trend_arrow') else None
+trend_text = TREND_LABELS.get(trend_obj, "→") if trend_obj else "→"
 status_label, glucose_class, badge_class = glucose_status(latest_mg, target_low_mg, target_high_mg)
-trend_text = TREND_LABELS.get(latest.trend, "→") if hasattr(latest, "trend") else "→"
 
-# Format reading timestamp (strip UTC offset for display)
-reading_ts = pd.to_datetime(latest.timestamp, utc=True).tz_localize(None)
-reading_time_str = reading_ts.strftime("%b %d, %Y  %H:%M:%S")
+if unit_choice == "mmol/L":
+    display_val  = f"{mg_to_mmol(latest_mg):.1f}"
+    display_unit = "mmol/L"
+elif unit_choice == "Both":
+    display_val  = f"{latest_mg:.0f} / {mg_to_mmol(latest_mg):.1f}"
+    display_unit = "mg/dL  |  mmol/L"
+else:
+    display_val  = f"{latest_mg:.0f}"
+    display_unit = "mg/dL"
 
-col_val, col_trend, col_status, col_last = st.columns([2, 2, 2, 3])
+ts = latest.factory_timestamp if hasattr(latest, 'factory_timestamp') and latest.factory_timestamp else latest.timestamp
+if hasattr(ts, 'astimezone'):
+    reading_time_str = ts.strftime("%b %d, %Y  %H:%M:%S")
+else:
+    reading_time_str = str(ts)
 
-with col_val:
-    if unit_choice == "mg/dL":
-        display_val = f"{latest_mg:.0f}"
-        display_unit = "mg/dL"
-    elif unit_choice == "mmol/L":
-        display_val = f"{mg_to_mmol(latest_mg):.1f}"
-        display_unit = "mmol/L"
-    else:  # Both
-        display_val = f"{latest_mg:.0f}"
-        display_unit = f"mg/dL &nbsp;|&nbsp; {mg_to_mmol(latest_mg):.1f} mmol/L"
+col_glucose, col_trend, col_status, col_last = st.columns([2, 1, 1, 2])
 
+with col_glucose:
     st.markdown(
         f'<div class="glucose-display {glucose_class}">{display_val}</div>'
-        f'<div style="font-size:14px;color:#666;margin-top:4px;">{display_unit}</div>',
+        f'<div style="font-size:14px;color:#888;margin-top:4px;">{display_unit}</div>',
         unsafe_allow_html=True
     )
 
@@ -522,7 +570,6 @@ with col_last:
         f'</div>',
         unsafe_allow_html=True
     )
-    # Also show mmol/L equivalent when in mg/dL mode and vice versa
     if unit_choice == "mg/dL":
         st.caption(f"≈ {mg_to_mmol(latest_mg):.1f} mmol/L")
     elif unit_choice == "mmol/L":
@@ -533,34 +580,19 @@ st.markdown("---")
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
 tab_chart, tab_readings, tab_stats = st.tabs(["📈 Trend Chart", "📋 All Readings", "📊 Statistics"])
 
+# ─── Get Full Merged Data ─────────────────────────────────────────────────────
+full_df = get_full_df()
+
 # ── Tab 1: Chart ──────────────────────────────────────────────────────────────
 with tab_chart:
-    # Combine graph (12h) + logbook (14d) + extended history for the widest possible window
-    all_chart_readings = list(st.session_state.graph_data or []) + list(st.session_state.logbook_data or [])
-    recent_df  = readings_to_df(all_chart_readings)
-    hist_df    = history_to_df(st.session_state.history_data or [])
-    if not recent_df.empty and not hist_df.empty:
-        full_df = pd.concat([recent_df, hist_df], ignore_index=True)
-    elif not hist_df.empty:
-        full_df = hist_df
-    else:
-        full_df = recent_df
-    if not full_df.empty:
-        full_df = full_df.drop_duplicates("Timestamp").sort_values("Timestamp")
-
-    # For week/calendar view, prefer extended history if available, else logbook
-    logbook_df = readings_to_df(list(st.session_state.logbook_data or []))
-    if not logbook_df.empty:
-        logbook_df = logbook_df.drop_duplicates("Timestamp").sort_values("Timestamp")
-    wide_df = full_df  # includes extended history
-
     if full_df.empty:
         st.info("No chart data available. Click Refresh Now in the sidebar.")
     else:
+        wide_df = full_df.copy()
+
         # ── Time Navigation Controls ──────────────────────────────────────────
-        # Determine available date range across all data sources
-        data_min_date = wide_df["Timestamp"].min().date()
-        data_max_date = wide_df["Timestamp"].max().date()
+        data_min_date  = wide_df["Timestamp"].min().date()
+        data_max_date  = wide_df["Timestamp"].max().date()
         available_dates = sorted(wide_df["Timestamp"].dt.date.unique())
 
         nav_col1, nav_col2, nav_col3, nav_col4, nav_col5, nav_col6 = st.columns([1.2, 1, 1, 1, 1, 2])
@@ -574,7 +606,7 @@ with tab_chart:
             min_offset = -(data_max_date - data_min_date).days
         else:
             min_offset = -((data_max_date - data_min_date).days // 7) * 7
-        # Clamp offset
+
         st.session_state.nav_offset_days = max(min_offset, min(0, st.session_state.nav_offset_days))
         offset = st.session_state.nav_offset_days
 
@@ -600,15 +632,14 @@ with tab_chart:
                 st.session_state.nav_offset_days = 0
                 st.rerun()
 
-        # Compute the window to display
         anchor_date = data_max_date + timedelta(days=st.session_state.nav_offset_days)
         if st.session_state.nav_view == "day":
             window_start = datetime.combine(anchor_date, datetime.min.time())
             window_end   = datetime.combine(anchor_date, datetime.max.time())
             period_label = anchor_date.strftime("%A, %b %d %Y")
         else:
-            week_start = anchor_date - timedelta(days=anchor_date.weekday())
-            week_end   = week_start + timedelta(days=6)
+            week_start   = anchor_date - timedelta(days=anchor_date.weekday())
+            week_end     = week_start + timedelta(days=6)
             window_start = datetime.combine(week_start, datetime.min.time())
             window_end   = datetime.combine(week_end,   datetime.max.time())
             period_label = f"Week of {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
@@ -619,13 +650,10 @@ with tab_chart:
                 unsafe_allow_html=True
             )
 
-        # ── Calendar date picker (Day view only) ──────────────────────────────────
+        # ── Calendar date picker (Day view only) ──────────────────────────────
         if st.session_state.nav_view == "day" and available_dates:
-            # Sync the calendar widget value to the current anchor_date whenever
-            # it drifts (e.g. after Back/Forward button clicks)
             if st.session_state.get("cal_picker") != anchor_date:
                 st.session_state["cal_picker"] = anchor_date
-
             cal_col1, cal_col2 = st.columns([1, 3])
             with cal_col1:
                 st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to date:</div>',
@@ -643,17 +671,14 @@ with tab_chart:
                     st.session_state.nav_offset_days = max(min_offset, min(0, new_offset))
                     st.rerun()
 
-        # Use appropriate data source
-        source_df = wide_df
-
-        chart_df = source_df[
-            (source_df["Timestamp"] >= window_start) &
-            (source_df["Timestamp"] <= window_end)
+        chart_df = wide_df[
+            (wide_df["Timestamp"] >= window_start) &
+            (wide_df["Timestamp"] <= window_end)
         ].copy()
+
         if chart_df.empty:
             st.info(f"No readings found for {period_label}.")
         else:
-            # Day view: show date label only
             if st.session_state.nav_view == "day":
                 date_str = anchor_date.strftime("%A, %B %d, %Y")
                 st.markdown(
@@ -664,63 +689,59 @@ with tab_chart:
                     unsafe_allow_html=True
                 )
 
-        # Convert target range for display
-        target_low_mmol  = round(target_low_mg  * MG_TO_MMOL, 1)
-        target_high_mmol = round(target_high_mg * MG_TO_MMOL, 1)
+            target_low_mmol  = round(target_low_mg  * MG_TO_MMOL, 1)
+            target_high_mmol = round(target_high_mg * MG_TO_MMOL, 1)
 
-        if not chart_df.empty:
-            # ── Dynamic Y-axis: centre the target range with equal padding ──────
-            # Compute a Y range that places the target band in the vertical middle,
-            # while also ensuring all actual data points are visible.
             def centered_yrange_mg(tgt_lo, tgt_hi, data_min, data_max):
-                """Return (y_min, y_max) that centres [tgt_lo, tgt_hi] in the chart
-                and includes all data points with comfortable padding.
-                Y-axis minimum is clamped to 0 (glucose cannot be negative)."""
                 tgt_centre = (tgt_lo + tgt_hi) / 2
                 tgt_half   = (tgt_hi - tgt_lo) / 2
-                # Half-span needed to show target range + 50% padding on each side
-                half_span  = max(tgt_half * 3.0, 60)   # at least ±60 mg/dL
-                # Expand to include actual data
-                half_span  = max(half_span, tgt_centre - data_min + 20,
-                                            data_max - tgt_centre + 20)
-                y_min = max(0, tgt_centre - half_span)  # never below 0
+                half_span  = max(tgt_half * 3.0, 60)
+                half_span  = max(half_span, tgt_centre - data_min + 20, data_max - tgt_centre + 20)
+                y_min = max(0, tgt_centre - half_span)
                 y_max = tgt_centre + half_span
                 return y_min, y_max
 
             data_min_mg = chart_df["Glucose_mg"].min()
             data_max_mg = chart_df["Glucose_mg"].max()
-            y_min_mg, y_max_mg = centered_yrange_mg(
-                target_low_mg, target_high_mg, data_min_mg, data_max_mg
-            )
+            y_min_mg, y_max_mg = centered_yrange_mg(target_low_mg, target_high_mg, data_min_mg, data_max_mg)
             y_min_mmol = round(y_min_mg * MG_TO_MMOL, 1)
             y_max_mmol = round(y_max_mg * MG_TO_MMOL, 1)
 
             fig = go.Figure()
 
+            rangeselector_cfg = dict(
+                buttons=[
+                    dict(count=3,  label="3h",  step="hour", stepmode="backward"),
+                    dict(count=6,  label="6h",  step="hour", stepmode="backward"),
+                    dict(count=12, label="12h", step="hour", stepmode="backward"),
+                    dict(count=24, label="24h", step="hour", stepmode="backward"),
+                ],
+                bgcolor="#f0f4ff", activecolor="#1a73e8",
+                font=dict(size=11),
+                x=0.055, y=1.08,
+                xanchor="left",
+            )
+            zoom_annotation = dict(
+                text="<b>Zoom:</b>", x=0.0, y=1.10, xref="paper", yref="paper",
+                showarrow=False, font=dict(size=12, color="#555"),
+                xanchor="left", yanchor="middle"
+            )
+
             if unit_choice == "Both":
-                # Primary Y axis: mg/dL
                 colors_mg = chart_df["Glucose_mg"].apply(
                     lambda v: "#cc0000" if v > target_high_mg else ("#e65c00" if v < target_low_mg else "#1a73e8")
                 )
                 fig.add_trace(go.Scatter(
-                    x=chart_df["Timestamp"],
-                    y=chart_df["Glucose_mg"],
-                    mode="lines+markers",
-                    name="mg/dL",
-                    yaxis="y1",
+                    x=chart_df["Timestamp"], y=chart_df["Glucose_mg"],
+                    mode="lines+markers", name="mg/dL", yaxis="y1",
                     line=dict(color="#1a73e8", width=2),
                     marker=dict(color=colors_mg, size=6),
                     hovertemplate="%{x|%H:%M}<br><b>%{y:.0f} mg/dL</b><extra></extra>"
                 ))
-                # Secondary Y axis: mmol/L (invisible trace for axis scaling)
                 fig.add_trace(go.Scatter(
-                    x=chart_df["Timestamp"],
-                    y=chart_df["Glucose_mmol"],
-                    mode="lines",
-                    name="mmol/L",
-                    yaxis="y2",
-                    line=dict(color="#1a73e8", width=0),
-                    showlegend=True,
+                    x=chart_df["Timestamp"], y=chart_df["Glucose_mmol"],
+                    mode="lines", name="mmol/L", yaxis="y2",
+                    line=dict(color="#1a73e8", width=0), showlegend=True,
                     hovertemplate="%{x|%H:%M}<br><b>%{y:.1f} mmol/L</b><extra></extra>"
                 ))
                 fig.add_hrect(y0=target_low_mg, y1=target_high_mg,
@@ -733,59 +754,28 @@ with tab_chart:
                 fig.update_layout(
                     xaxis_title="Time",
                     yaxis=dict(title="Glucose (mg/dL)", range=[y_min_mg, y_max_mg], side="left"),
-                    yaxis2=dict(
-                        title="Glucose (mmol/L)",
-                        range=[y_min_mmol, y_max_mmol],
-                        overlaying="y",
-                        side="right",
-                        showgrid=False,
-                    ),
-                    hovermode="x unified",
-                    height=500,
-                    template="plotly_white",
+                    yaxis2=dict(title="Glucose (mmol/L)", range=[y_min_mmol, y_max_mmol],
+                                overlaying="y", side="right", showgrid=False),
+                    hovermode="x unified", height=500, template="plotly_white",
                     margin=dict(l=0, r=60, t=20, b=60),
                     legend=dict(orientation="h", y=1.05),
-                    xaxis=dict(
-                        rangeslider=dict(visible=False),
-                        rangeselector=dict(
-                            buttons=[
-                                dict(count=3,  label="3h",  step="hour",  stepmode="backward"),
-                                dict(count=6,  label="6h",  step="hour",  stepmode="backward"),
-                                dict(count=12, label="12h", step="hour",  stepmode="backward"),
-                                dict(count=24, label="24h", step="hour",  stepmode="backward"),
-                            ],
-                            bgcolor="#f0f4ff", activecolor="#1a73e8",
-                            font=dict(size=11),
-                            x=0.055, y=1.08,
-                            xanchor="left",
-                        ),
-                    ),
-                    annotations=[
-                        dict(text="<b>Zoom:</b>", x=0.0, y=1.10, xref="paper", yref="paper",
-                             showarrow=False, font=dict(size=12, color="#555"),
-                             xanchor="left", yanchor="middle"),
-                    ],
+                    xaxis=dict(rangeslider=dict(visible=False), rangeselector=rangeselector_cfg),
+                    annotations=[zoom_annotation],
                 )
-
             else:
-                # Single axis
                 if unit_choice == "mmol/L":
-                    y_col     = "Glucose_mmol"
-                    y_label   = "Glucose (mmol/L)"
-                    y_range   = [y_min_mmol, y_max_mmol]
-                    tgt_low   = target_low_mmol
-                    tgt_high  = target_high_mmol
-                    low_ann   = f"Low ({target_low_mmol} mmol/L)"
-                    high_ann  = f"High ({target_high_mmol} mmol/L)"
+                    y_col, y_label = "Glucose_mmol", "Glucose (mmol/L)"
+                    y_range = [y_min_mmol, y_max_mmol]
+                    tgt_low, tgt_high = target_low_mmol, target_high_mmol
+                    low_ann  = f"Low ({target_low_mmol} mmol/L)"
+                    high_ann = f"High ({target_high_mmol} mmol/L)"
                     hover_fmt = "%{x|%H:%M}<br><b>%{y:.1f} mmol/L</b><extra></extra>"
                 else:
-                    y_col     = "Glucose_mg"
-                    y_label   = "Glucose (mg/dL)"
-                    y_range   = [y_min_mg, y_max_mg]
-                    tgt_low   = target_low_mg
-                    tgt_high  = target_high_mg
-                    low_ann   = f"Low ({target_low_mg} mg/dL)"
-                    high_ann  = f"High ({target_high_mg} mg/dL)"
+                    y_col, y_label = "Glucose_mg", "Glucose (mg/dL)"
+                    y_range = [y_min_mg, y_max_mg]
+                    tgt_low, tgt_high = target_low_mg, target_high_mg
+                    low_ann  = f"Low ({target_low_mg} mg/dL)"
+                    high_ann = f"High ({target_high_mg} mg/dL)"
                     hover_fmt = "%{x|%H:%M}<br><b>%{y:.0f} mg/dL</b><extra></extra>"
 
                 colors = chart_df[y_col].apply(
@@ -795,10 +785,8 @@ with tab_chart:
                               fillcolor="rgba(0,200,0,0.07)", line_width=0,
                               annotation_text="Target Range", annotation_position="top left")
                 fig.add_trace(go.Scatter(
-                    x=chart_df["Timestamp"],
-                    y=chart_df[y_col],
-                    mode="lines+markers",
-                    name="Glucose",
+                    x=chart_df["Timestamp"], y=chart_df[y_col],
+                    mode="lines+markers", name="Glucose",
                     line=dict(color="#1a73e8", width=2),
                     marker=dict(color=colors, size=7),
                     hovertemplate=hover_fmt
@@ -810,91 +798,58 @@ with tab_chart:
                 fig.update_layout(
                     xaxis_title="Time",
                     yaxis=dict(title=y_label, range=y_range),
-                    hovermode="x unified",
-                    height=500,
-                    template="plotly_white",
+                    hovermode="x unified", height=500, template="plotly_white",
                     margin=dict(l=0, r=0, t=20, b=60),
                     showlegend=False,
-                    xaxis=dict(
-                        rangeslider=dict(visible=False),
-                        rangeselector=dict(
-                            buttons=[
-                                dict(count=3,  label="3h",  step="hour",  stepmode="backward"),
-                                dict(count=6,  label="6h",  step="hour",  stepmode="backward"),
-                                dict(count=12, label="12h", step="hour",  stepmode="backward"),
-                                dict(count=24, label="24h", step="hour",  stepmode="backward"),
-                            ],
-                            bgcolor="#f0f4ff", activecolor="#1a73e8",
-                            font=dict(size=11),
-                            x=0.055, y=1.08,
-                            xanchor="left",
-                        ),
-                    ),
-                    annotations=[
-                        dict(text="<b>Zoom:</b>", x=0.0, y=1.10, xref="paper", yref="paper",
-                             showarrow=False, font=dict(size=12, color="#555"),
-                             xanchor="left", yanchor="middle"),
-                    ],
+                    xaxis=dict(rangeslider=dict(visible=False), rangeselector=rangeselector_cfg),
+                    annotations=[zoom_annotation],
                 )
 
             st.plotly_chart(fig, use_container_width=True)
 
 # ── Tab 2: Readings Table ─────────────────────────────────────────────────────
 with tab_readings:
-    all_readings = list(st.session_state.graph_data or []) + list(st.session_state.logbook_data or [])
-    all_df = readings_to_df(all_readings)
-
-    if all_df.empty:
+    if full_df.empty:
         st.info("No readings available.")
     else:
-        all_df = all_df.drop_duplicates("Timestamp").sort_values("Timestamp", ascending=False).copy()
+        all_df = full_df.drop_duplicates("Timestamp").sort_values("Timestamp", ascending=False).copy()
 
-        # Build display columns based on unit choice
         if unit_choice == "mg/dL":
             all_df["Glucose"] = all_df["Glucose_mg"].apply(lambda v: f"{v:.0f} mg/dL")
-            status_col = all_df["Glucose_mg"].apply(
-                lambda v: "HIGH" if v > target_high_mg else ("LOW" if v < target_low_mg else "In Range")
-            )
         elif unit_choice == "mmol/L":
             all_df["Glucose"] = all_df["Glucose_mmol"].apply(lambda v: f"{v:.1f} mmol/L")
-            status_col = all_df["Glucose_mg"].apply(
-                lambda v: "HIGH" if v > target_high_mg else ("LOW" if v < target_low_mg else "In Range")
-            )
-        else:  # Both
+        else:
             all_df["Glucose"] = all_df.apply(
                 lambda r: f"{r['Glucose_mg']:.0f} mg/dL  |  {r['Glucose_mmol']:.1f} mmol/L", axis=1
             )
-            status_col = all_df["Glucose_mg"].apply(
-                lambda v: "HIGH" if v > target_high_mg else ("LOW" if v < target_low_mg else "In Range")
-            )
 
-        all_df["Status"] = status_col
+        all_df["Status"] = all_df["Glucose_mg"].apply(
+            lambda v: "HIGH" if v > target_high_mg else ("LOW" if v < target_low_mg else "In Range")
+        )
         all_df["Time"] = all_df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
 
         display_df = all_df[["Time", "Glucose", "Status"]].copy()
 
         def highlight_row(row):
             s = row["Status"]
-            if s == "HIGH":
-                return ["background-color: #fff0f0"] * len(row)
-            elif s == "LOW":
-                return ["background-color: #fff8f0"] * len(row)
+            if s == "HIGH":   return ["background-color: #fff0f0"] * len(row)
+            elif s == "LOW":  return ["background-color: #fff8f0"] * len(row)
             return [""] * len(row)
 
         styled = display_df.style.apply(highlight_row, axis=1)
+        st.caption(f"Showing {len(display_df):,} readings")
         st.dataframe(styled, use_container_width=True, height=500)
 
 # ── Tab 3: Statistics ─────────────────────────────────────────────────────────
 with tab_stats:
-    logbook_df = readings_to_df(st.session_state.logbook_data)
-
-    if logbook_df.empty:
+    if full_df.empty:
         st.info("No statistics data available.")
     else:
-        vals_mg = logbook_df["Glucose_mg"]
+        stats_df = full_df.copy()
+        vals_mg  = stats_df["Glucose_mg"]
 
         if unit_choice == "mmol/L":
-            vals    = logbook_df["Glucose_mmol"]
+            vals    = stats_df["Glucose_mmol"]
             u_label = "mmol/L"
             avg_fmt = f"{vals.mean():.1f} mmol/L"
             min_fmt = f"{vals.min():.1f} mmol/L"
@@ -908,6 +863,10 @@ with tab_stats:
             max_fmt = f"{vals.max():.0f} mg/dL"
             std_fmt = f"{vals.std():.1f}"
 
+        date_range_str = (f"{stats_df['Timestamp'].min().strftime('%b %d, %Y')} – "
+                          f"{stats_df['Timestamp'].max().strftime('%b %d, %Y')}")
+        st.caption(f"Statistics based on {len(stats_df):,} readings  ·  {date_range_str}")
+
         c1, c2, c3, c4 = st.columns(4)
         c1.metric("Average",  avg_fmt)
         c2.metric("Minimum",  min_fmt)
@@ -915,7 +874,7 @@ with tab_stats:
         c4.metric("Std Dev",  std_fmt)
 
         st.markdown("---")
-        st.subheader("Time in Range (last ~14 days)")
+        st.subheader("Time in Range")
 
         total      = len(vals_mg)
         low_pct    = (vals_mg < target_low_mg).sum()  / total * 100
@@ -924,13 +883,17 @@ with tab_stats:
 
         if unit_choice == "mmol/L":
             range_label = f"{mg_to_mmol(target_low_mg):.1f}–{mg_to_mmol(target_high_mg):.1f} mmol/L"
+            low_thr  = f"{mg_to_mmol(target_low_mg):.1f}"
+            high_thr = f"{mg_to_mmol(target_high_mg):.1f}"
         else:
             range_label = f"{target_low_mg}–{target_high_mg} mg/dL"
+            low_thr  = str(target_low_mg)
+            high_thr = str(target_high_mg)
 
         col_l, col_n, col_h = st.columns(3)
-        col_l.metric(f"🟠 Low (<{target_low_mg if unit_choice != 'mmol/L' else mg_to_mmol(target_low_mg)} {u_label})",  f"{low_pct:.1f}%")
-        col_n.metric(f"🟢 In Range ({range_label})", f"{normal_pct:.1f}%")
-        col_h.metric(f"🔴 High (>{target_high_mg if unit_choice != 'mmol/L' else mg_to_mmol(target_high_mg)} {u_label})", f"{high_pct:.1f}%")
+        col_l.metric(f"🟠 Low (<{low_thr} {u_label})",         f"{low_pct:.1f}%")
+        col_n.metric(f"🟢 In Range ({range_label})",            f"{normal_pct:.1f}%")
+        col_h.metric(f"🔴 High (>{high_thr} {u_label})",        f"{high_pct:.1f}%")
 
         fig_pie = px.pie(
             values=[low_pct, normal_pct, high_pct],
@@ -944,16 +907,19 @@ with tab_stats:
 
         st.markdown("---")
         st.subheader("Daily Average Trend")
-        logbook_df["Date"] = logbook_df["Timestamp"].dt.date
+        stats_df["Date"] = stats_df["Timestamp"].dt.date
+
+        target_low_mmol  = round(target_low_mg  * MG_TO_MMOL, 1)
+        target_high_mmol = round(target_high_mg * MG_TO_MMOL, 1)
 
         if unit_choice == "mmol/L":
-            daily = logbook_df.groupby("Date")["Glucose_mmol"].mean().reset_index()
+            daily = stats_df.groupby("Date")["Glucose_mmol"].mean().reset_index()
             daily.columns = ["Date", "Avg"]
             bar_colors = ["#cc0000" if v > target_high_mmol else ("#e65c00" if v < target_low_mmol else "#1a73e8") for v in daily["Avg"]]
             y_title = "Average Glucose (mmol/L)"
             hlines  = [(target_low_mmol, "#e65c00"), (target_high_mmol, "#cc0000")]
         else:
-            daily = logbook_df.groupby("Date")["Glucose_mg"].mean().reset_index()
+            daily = stats_df.groupby("Date")["Glucose_mg"].mean().reset_index()
             daily.columns = ["Date", "Avg"]
             bar_colors = ["#cc0000" if v > target_high_mg else ("#e65c00" if v < target_low_mg else "#1a73e8") for v in daily["Avg"]]
             y_title = "Average Glucose (mg/dL)"

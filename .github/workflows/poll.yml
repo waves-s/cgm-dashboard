@@ -1,0 +1,49 @@
+name: CGM Background Poller
+
+on:
+  schedule:
+    # Run every 5 minutes, 24/7
+    - cron: '*/5 * * * *'
+  workflow_dispatch:  # Allow manual trigger from GitHub UI
+
+permissions:
+  contents: write  # Allow committing cache.json back to the repo
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4  # Prevent runaway jobs
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_PAT }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install pylibrelinkup>=0.10.0
+
+      - name: Run poller
+        env:
+          LIBREVIEW_EMAIL: ${{ secrets.LIBREVIEW_EMAIL }}
+          LIBREVIEW_PASSWORD: ${{ secrets.LIBREVIEW_PASSWORD }}
+        run: python poller.py
+
+      - name: Commit updated cache
+        run: |
+          git config --local user.email "cgm-poller[bot]@users.noreply.github.com"
+          git config --local user.name "CGM Poller Bot"
+          git add cache.json
+          # Only commit if cache.json actually changed
+          if git diff --staged --quiet; then
+            echo "No changes to cache.json, skipping commit."
+          else
+            git commit -m "chore: update glucose cache [skip ci]"
+            git push
+          fi
