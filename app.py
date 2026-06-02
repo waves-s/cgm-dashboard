@@ -66,6 +66,8 @@ for key, default in {
     "graph_data": [],
     "logbook_data": [],
     "latest_reading": None,
+    "nav_offset_days": 0,   # 0 = today/latest, negative = days back
+    "nav_view": "day",      # "day" or "week"
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -345,129 +347,201 @@ tab_chart, tab_readings, tab_stats = st.tabs(["📈 Trend Chart", "📋 All Read
 
 # ── Tab 1: Chart ──────────────────────────────────────────────────────────────
 with tab_chart:
-    graph_df = readings_to_df(st.session_state.graph_data)
+    # Combine graph (12h) + logbook (14d) for the widest possible window
+    all_chart_readings = list(st.session_state.graph_data or []) + list(st.session_state.logbook_data or [])
+    full_df = readings_to_df(all_chart_readings)
+    if not full_df.empty:
+        full_df = full_df.drop_duplicates("Timestamp").sort_values("Timestamp")
 
-    if graph_df.empty:
+    if full_df.empty:
         st.info("No chart data available. Click Refresh Now in the sidebar.")
     else:
-        hours = st.slider("Show last N hours", min_value=1, max_value=12, value=12, step=1)
-        max_ts = graph_df["Timestamp"].max()
-        cutoff = max_ts - timedelta(hours=hours)
-        chart_df = graph_df[graph_df["Timestamp"] >= cutoff].copy()
+        # ── Time Navigation Controls ──────────────────────────────────────────
+        nav_col1, nav_col2, nav_col3, nav_col4, nav_col5, nav_col6 = st.columns([1.2, 1, 1, 1, 1, 2])
+
+        with nav_col1:
+            view_mode = st.radio("View", ["Day", "Week"], horizontal=True,
+                                  index=0 if st.session_state.nav_view == "day" else 1,
+                                  key="view_mode_radio")
+            st.session_state.nav_view = view_mode.lower()
+
+        # Determine the data date range
+        data_min_date = full_df["Timestamp"].min().date()
+        data_max_date = full_df["Timestamp"].max().date()
+        max_offset = 0
+        if st.session_state.nav_view == "day":
+            min_offset = -(data_max_date - data_min_date).days
+        else:
+            min_offset = -((data_max_date - data_min_date).days // 7) * 7
+
+        # Clamp offset
+        st.session_state.nav_offset_days = max(min_offset, min(0, st.session_state.nav_offset_days))
+        offset = st.session_state.nav_offset_days
+
+        with nav_col2:
+            st.write("")
+            if st.button("⏮ Oldest", use_container_width=True):
+                st.session_state.nav_offset_days = min_offset
+                st.rerun()
+        with nav_col3:
+            st.write("")
+            step = 1 if st.session_state.nav_view == "day" else 7
+            if st.button("◀ Back", use_container_width=True):
+                st.session_state.nav_offset_days = max(min_offset, offset - step)
+                st.rerun()
+        with nav_col4:
+            st.write("")
+            if st.button("Forward ▶", use_container_width=True):
+                st.session_state.nav_offset_days = min(0, offset + step)
+                st.rerun()
+        with nav_col5:
+            st.write("")
+            if st.button("Latest ⏭", use_container_width=True):
+                st.session_state.nav_offset_days = 0
+                st.rerun()
+
+        # Compute the window to display
+        anchor_date = data_max_date + timedelta(days=st.session_state.nav_offset_days)
+        if st.session_state.nav_view == "day":
+            window_start = datetime.combine(anchor_date, datetime.min.time())
+            window_end   = datetime.combine(anchor_date, datetime.max.time())
+            period_label = anchor_date.strftime("%A, %b %d %Y")
+        else:
+            week_start = anchor_date - timedelta(days=anchor_date.weekday())
+            week_end   = week_start + timedelta(days=6)
+            window_start = datetime.combine(week_start, datetime.min.time())
+            window_end   = datetime.combine(week_end,   datetime.max.time())
+            period_label = f"Week of {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
+
+        with nav_col6:
+            st.markdown(
+                f'<div style="padding-top:28px;font-size:15px;font-weight:600;color:#333;">📅 {period_label}</div>',
+                unsafe_allow_html=True
+            )
+
+        chart_df = full_df[
+            (full_df["Timestamp"] >= window_start) &
+            (full_df["Timestamp"] <= window_end)
+        ].copy()
+
+        if chart_df.empty:
+            st.info(f"No readings found for {period_label}.")
+        else:
+            # Within-window hour slider (only for day view)
+            if st.session_state.nav_view == "day":
+                hours = st.slider("Zoom: show last N hours of this day",
+                                  min_value=1, max_value=24, value=24, step=1)
+                max_ts = chart_df["Timestamp"].max()
+                chart_df = chart_df[chart_df["Timestamp"] >= max_ts - timedelta(hours=hours)].copy()
 
         # Convert target range for display
         target_low_mmol  = round(target_low_mg  * MG_TO_MMOL, 1)
         target_high_mmol = round(target_high_mg * MG_TO_MMOL, 1)
 
-        fig = go.Figure()
+        if not chart_df.empty:
+            fig = go.Figure()
 
-        if unit_choice == "Both":
-            # Primary Y axis: mg/dL
-            colors_mg = chart_df["Glucose_mg"].apply(
-                lambda v: "#cc0000" if v > target_high_mg else ("#e65c00" if v < target_low_mg else "#1a73e8")
-            )
-            fig.add_trace(go.Scatter(
-                x=chart_df["Timestamp"],
-                y=chart_df["Glucose_mg"],
-                mode="lines+markers",
-                name="mg/dL",
-                yaxis="y1",
-                line=dict(color="#1a73e8", width=2),
-                marker=dict(color=colors_mg, size=6),
-                hovertemplate="%{x|%H:%M}<br><b>%{y:.0f} mg/dL</b><extra></extra>"
-            ))
-            # Secondary Y axis: mmol/L (invisible trace for axis scaling)
-            fig.add_trace(go.Scatter(
-                x=chart_df["Timestamp"],
-                y=chart_df["Glucose_mmol"],
-                mode="lines",
-                name="mmol/L",
-                yaxis="y2",
-                line=dict(color="#1a73e8", width=0),
-                showlegend=True,
-                hovertemplate="%{x|%H:%M}<br><b>%{y:.1f} mmol/L</b><extra></extra>"
-            ))
-            # Target range shading (mg/dL axis)
-            fig.add_hrect(y0=target_low_mg, y1=target_high_mg,
-                          fillcolor="rgba(0,200,0,0.07)", line_width=0,
-                          annotation_text="Target Range", annotation_position="top left")
-            fig.add_hline(y=target_low_mg,  line_dash="dot", line_color="#e65c00",
-                          annotation_text=f"Low ({target_low_mg} mg/dL)", annotation_position="bottom right")
-            fig.add_hline(y=target_high_mg, line_dash="dot", line_color="#cc0000",
-                          annotation_text=f"High ({target_high_mg} mg/dL)", annotation_position="top right")
+            if unit_choice == "Both":
+                # Primary Y axis: mg/dL
+                colors_mg = chart_df["Glucose_mg"].apply(
+                    lambda v: "#cc0000" if v > target_high_mg else ("#e65c00" if v < target_low_mg else "#1a73e8")
+                )
+                fig.add_trace(go.Scatter(
+                    x=chart_df["Timestamp"],
+                    y=chart_df["Glucose_mg"],
+                    mode="lines+markers",
+                    name="mg/dL",
+                    yaxis="y1",
+                    line=dict(color="#1a73e8", width=2),
+                    marker=dict(color=colors_mg, size=6),
+                    hovertemplate="%{x|%H:%M}<br><b>%{y:.0f} mg/dL</b><extra></extra>"
+                ))
+                # Secondary Y axis: mmol/L (invisible trace for axis scaling)
+                fig.add_trace(go.Scatter(
+                    x=chart_df["Timestamp"],
+                    y=chart_df["Glucose_mmol"],
+                    mode="lines",
+                    name="mmol/L",
+                    yaxis="y2",
+                    line=dict(color="#1a73e8", width=0),
+                    showlegend=True,
+                    hovertemplate="%{x|%H:%M}<br><b>%{y:.1f} mmol/L</b><extra></extra>"
+                ))
+                fig.add_hrect(y0=target_low_mg, y1=target_high_mg,
+                              fillcolor="rgba(0,200,0,0.07)", line_width=0,
+                              annotation_text="Target Range", annotation_position="top left")
+                fig.add_hline(y=target_low_mg,  line_dash="dot", line_color="#e65c00",
+                              annotation_text=f"Low ({target_low_mg} mg/dL)", annotation_position="bottom right")
+                fig.add_hline(y=target_high_mg, line_dash="dot", line_color="#cc0000",
+                              annotation_text=f"High ({target_high_mg} mg/dL)", annotation_position="top right")
+                fig.update_layout(
+                    xaxis_title="Time",
+                    yaxis=dict(title="Glucose (mg/dL)", range=[40, 350], side="left"),
+                    yaxis2=dict(
+                        title="Glucose (mmol/L)",
+                        range=[round(40 * MG_TO_MMOL, 1), round(350 * MG_TO_MMOL, 1)],
+                        overlaying="y",
+                        side="right",
+                        showgrid=False,
+                    ),
+                    hovermode="x unified",
+                    height=440,
+                    template="plotly_white",
+                    margin=dict(l=0, r=60, t=20, b=0),
+                    legend=dict(orientation="h", y=1.05),
+                )
 
-            fig.update_layout(
-                xaxis_title="Time",
-                yaxis=dict(title="Glucose (mg/dL)", range=[40, 350], side="left"),
-                yaxis2=dict(
-                    title="Glucose (mmol/L)",
-                    range=[round(40 * MG_TO_MMOL, 1), round(350 * MG_TO_MMOL, 1)],
-                    overlaying="y",
-                    side="right",
-                    showgrid=False,
-                ),
-                hovermode="x unified",
-                height=440,
-                template="plotly_white",
-                margin=dict(l=0, r=60, t=20, b=0),
-                legend=dict(orientation="h", y=1.05),
-            )
-
-        else:
-            # Single axis
-            if unit_choice == "mmol/L":
-                y_col   = "Glucose_mmol"
-                y_label = "Glucose (mmol/L)"
-                y_range = [round(40 * MG_TO_MMOL, 1), round(350 * MG_TO_MMOL, 1)]
-                tgt_low  = target_low_mmol
-                tgt_high = target_high_mmol
-                low_ann  = f"Low ({target_low_mmol} mmol/L)"
-                high_ann = f"High ({target_high_mmol} mmol/L)"
-                hover_fmt = "%{x|%H:%M}<br><b>%{y:.1f} mmol/L</b><extra></extra>"
             else:
-                y_col   = "Glucose_mg"
-                y_label = "Glucose (mg/dL)"
-                y_range = [40, 350]
-                tgt_low  = target_low_mg
-                tgt_high = target_high_mg
-                low_ann  = f"Low ({target_low_mg} mg/dL)"
-                high_ann = f"High ({target_high_mg} mg/dL)"
-                hover_fmt = "%{x|%H:%M}<br><b>%{y:.0f} mg/dL</b><extra></extra>"
+                # Single axis
+                if unit_choice == "mmol/L":
+                    y_col     = "Glucose_mmol"
+                    y_label   = "Glucose (mmol/L)"
+                    y_range   = [round(40 * MG_TO_MMOL, 1), round(350 * MG_TO_MMOL, 1)]
+                    tgt_low   = target_low_mmol
+                    tgt_high  = target_high_mmol
+                    low_ann   = f"Low ({target_low_mmol} mmol/L)"
+                    high_ann  = f"High ({target_high_mmol} mmol/L)"
+                    hover_fmt = "%{x|%H:%M}<br><b>%{y:.1f} mmol/L</b><extra></extra>"
+                else:
+                    y_col     = "Glucose_mg"
+                    y_label   = "Glucose (mg/dL)"
+                    y_range   = [40, 350]
+                    tgt_low   = target_low_mg
+                    tgt_high  = target_high_mg
+                    low_ann   = f"Low ({target_low_mg} mg/dL)"
+                    high_ann  = f"High ({target_high_mg} mg/dL)"
+                    hover_fmt = "%{x|%H:%M}<br><b>%{y:.0f} mg/dL</b><extra></extra>"
 
-            colors = chart_df[y_col].apply(
-                lambda v: "#cc0000" if v > tgt_high else ("#e65c00" if v < tgt_low else "#1a73e8")
-            )
+                colors = chart_df[y_col].apply(
+                    lambda v: "#cc0000" if v > tgt_high else ("#e65c00" if v < tgt_low else "#1a73e8")
+                )
+                fig.add_hrect(y0=tgt_low, y1=tgt_high,
+                              fillcolor="rgba(0,200,0,0.07)", line_width=0,
+                              annotation_text="Target Range", annotation_position="top left")
+                fig.add_trace(go.Scatter(
+                    x=chart_df["Timestamp"],
+                    y=chart_df[y_col],
+                    mode="lines+markers",
+                    name="Glucose",
+                    line=dict(color="#1a73e8", width=2),
+                    marker=dict(color=colors, size=7),
+                    hovertemplate=hover_fmt
+                ))
+                fig.add_hline(y=tgt_low,  line_dash="dot", line_color="#e65c00",
+                              annotation_text=low_ann,  annotation_position="bottom right")
+                fig.add_hline(y=tgt_high, line_dash="dot", line_color="#cc0000",
+                              annotation_text=high_ann, annotation_position="top right")
+                fig.update_layout(
+                    xaxis_title="Time",
+                    yaxis=dict(title=y_label, range=y_range),
+                    hovermode="x unified",
+                    height=440,
+                    template="plotly_white",
+                    margin=dict(l=0, r=0, t=20, b=0),
+                    showlegend=False,
+                )
 
-            fig.add_hrect(y0=tgt_low, y1=tgt_high,
-                          fillcolor="rgba(0,200,0,0.07)", line_width=0,
-                          annotation_text="Target Range", annotation_position="top left")
-
-            fig.add_trace(go.Scatter(
-                x=chart_df["Timestamp"],
-                y=chart_df[y_col],
-                mode="lines+markers",
-                name="Glucose",
-                line=dict(color="#1a73e8", width=2),
-                marker=dict(color=colors, size=7),
-                hovertemplate=hover_fmt
-            ))
-
-            fig.add_hline(y=tgt_low,  line_dash="dot", line_color="#e65c00",
-                          annotation_text=low_ann,  annotation_position="bottom right")
-            fig.add_hline(y=tgt_high, line_dash="dot", line_color="#cc0000",
-                          annotation_text=high_ann, annotation_position="top right")
-
-            fig.update_layout(
-                xaxis_title="Time",
-                yaxis=dict(title=y_label, range=y_range),
-                hovermode="x unified",
-                height=440,
-                template="plotly_white",
-                margin=dict(l=0, r=0, t=20, b=0),
-                showlegend=False,
-            )
-
-        st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, use_container_width=True)
 
 # ── Tab 2: Readings Table ─────────────────────────────────────────────────────
 with tab_readings:
