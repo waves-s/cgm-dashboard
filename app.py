@@ -47,6 +47,62 @@ div[data-testid="metric-container"] {
     padding: 12px 16px;
     text-align: center;
 }
+/* ── Chart control bar ── */
+.ctrl-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: #f8f9fa;
+    border: 1px solid #e0e0e0;
+    border-radius: 14px;
+    padding: 10px 18px;
+    margin-bottom: 12px;
+}
+.ctrl-period {
+    font-size: 15px;
+    font-weight: 700;
+    color: #1a1a1a;
+    white-space: nowrap;
+    flex: 1;
+}
+.ctrl-period span {
+    font-size: 12px;
+    font-weight: 400;
+    color: #888;
+    margin-left: 6px;
+}
+/* ── Zoom pill ── */
+.zoom-bar {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: #f0f4ff;
+    border: 1px solid #c5d3f5;
+    border-radius: 12px;
+    padding: 8px 16px;
+    margin-bottom: 10px;
+}
+.zoom-label {
+    font-size: 12px;
+    font-weight: 600;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+}
+.zoom-value {
+    font-size: 26px;
+    font-weight: 900;
+    color: #1a73e8;
+    line-height: 1;
+    min-width: 52px;
+    text-align: right;
+}
+.zoom-sub {
+    font-size: 11px;
+    color: #888;
+    margin-top: 1px;
+}
 hr { border-top: 1px solid #e0e0e0; margin: 16px 0; }
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
@@ -368,18 +424,9 @@ with tab_chart:
         st.info("No chart data available. Click Refresh Now in the sidebar.")
     else:
         # ── Time Navigation Controls ──────────────────────────────────────────
-        nav_col1, nav_col2, nav_col3, nav_col4, nav_col5, nav_col6 = st.columns([1.2, 1, 1, 1, 1, 2])
-
-        with nav_col1:
-            view_mode = st.radio("View", ["Day", "Week"], horizontal=True,
-                                  index=0 if st.session_state.nav_view == "day" else 1,
-                                  key="view_mode_radio")
-            st.session_state.nav_view = view_mode.lower()
-
         # Determine the data date range
         data_min_date = full_df["Timestamp"].min().date()
         data_max_date = full_df["Timestamp"].max().date()
-        max_offset = 0
         if st.session_state.nav_view == "day":
             min_offset = -(data_max_date - data_min_date).days
         else:
@@ -389,46 +436,57 @@ with tab_chart:
         st.session_state.nav_offset_days = max(min_offset, min(0, st.session_state.nav_offset_days))
         offset = st.session_state.nav_offset_days
 
-        with nav_col2:
-            st.write("")
-            if st.button("⏮ Oldest", use_container_width=True):
-                st.session_state.nav_offset_days = min_offset
-                st.rerun()
-        with nav_col3:
-            st.write("")
-            step = 1 if st.session_state.nav_view == "day" else 7
-            if st.button("◀ Back", use_container_width=True):
-                st.session_state.nav_offset_days = max(min_offset, offset - step)
-                st.rerun()
-        with nav_col4:
-            st.write("")
-            if st.button("Forward ▶", use_container_width=True):
-                st.session_state.nav_offset_days = min(0, offset + step)
-                st.rerun()
-        with nav_col5:
-            st.write("")
-            if st.button("Latest ⏭", use_container_width=True):
-                st.session_state.nav_offset_days = 0
-                st.rerun()
-
         # Compute the window to display
         anchor_date = data_max_date + timedelta(days=st.session_state.nav_offset_days)
         if st.session_state.nav_view == "day":
             window_start = datetime.combine(anchor_date, datetime.min.time())
             window_end   = datetime.combine(anchor_date, datetime.max.time())
             period_label = anchor_date.strftime("%A, %b %d %Y")
+            period_sub   = f"{(data_max_date - anchor_date).days} day(s) ago" if anchor_date < data_max_date else "Today"
         else:
             week_start = anchor_date - timedelta(days=anchor_date.weekday())
             week_end   = week_start + timedelta(days=6)
             window_start = datetime.combine(week_start, datetime.min.time())
             window_end   = datetime.combine(week_end,   datetime.max.time())
-            period_label = f"Week of {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
+            period_label = f"{week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
+            period_sub   = "Current week" if offset == 0 else f"{abs(offset)//7} week(s) ago"
 
-        with nav_col6:
+        # ── Polished control bar (period label + view toggle + nav buttons) ──────
+        bar_left, bar_right = st.columns([3, 4])
+        with bar_left:
             st.markdown(
-                f'<div style="padding-top:28px;font-size:15px;font-weight:600;color:#333;">📅 {period_label}</div>',
+                f'<div style="background:#f8f9fa;border:1px solid #e0e0e0;border-radius:14px;'
+                f'padding:12px 20px;display:inline-block;">'
+                f'<div style="font-size:11px;font-weight:600;color:#888;text-transform:uppercase;'
+                f'letter-spacing:0.6px;margin-bottom:2px;">{period_sub}</div>'
+                f'<div style="font-size:17px;font-weight:800;color:#1a1a1a;">📅 {period_label}</div>'
+                f'</div>',
                 unsafe_allow_html=True
             )
+        with bar_right:
+            vc1, vc2, vc3, vc4, vc5 = st.columns([1.4, 1, 1, 1, 1])
+            with vc1:
+                view_mode = st.radio("View", ["Day", "Week"], horizontal=True,
+                                      index=0 if st.session_state.nav_view == "day" else 1,
+                                      key="view_mode_radio", label_visibility="collapsed")
+                st.session_state.nav_view = view_mode.lower()
+            with vc2:
+                if st.button("⏮", use_container_width=True, help="Jump to oldest"):
+                    st.session_state.nav_offset_days = min_offset
+                    st.rerun()
+            with vc3:
+                step = 1 if st.session_state.nav_view == "day" else 7
+                if st.button("◀", use_container_width=True, help="Previous period"):
+                    st.session_state.nav_offset_days = max(min_offset, offset - step)
+                    st.rerun()
+            with vc4:
+                if st.button("▶", use_container_width=True, help="Next period"):
+                    st.session_state.nav_offset_days = min(0, offset + step)
+                    st.rerun()
+            with vc5:
+                if st.button("⏭", use_container_width=True, help="Jump to latest"):
+                    st.session_state.nav_offset_days = 0
+                    st.rerun()
 
         chart_df = full_df[
             (full_df["Timestamp"] >= window_start) &
@@ -438,30 +496,60 @@ with tab_chart:
         if chart_df.empty:
             st.info(f"No readings found for {period_label}.")
         else:
-            # Within-window hour zoom (only for day view)
+            # Within-window hour zoom (only for day view) ── polished pill layout
             if st.session_state.nav_view == "day":
                 max_ts = chart_df["Timestamp"].max()
                 min_ts = chart_df["Timestamp"].min()
                 avail_hours = max(1, int((max_ts - min_ts).total_seconds() / 3600) + 1)
                 avail_hours = min(avail_hours, 24)
 
-                zoom_col1, zoom_col2 = st.columns([3, 1])
-                with zoom_col1:
+                z_left, z_mid, z_right = st.columns([0.18, 3.5, 0.18])
+                with z_left:
+                    st.markdown(
+                        '<div style="padding-top:34px;font-size:11px;font-weight:600;'
+                        'color:#888;text-align:center;text-transform:uppercase;letter-spacing:0.5px;">'
+                        '1h</div>',
+                        unsafe_allow_html=True
+                    )
+                with z_mid:
+                    st.markdown(
+                        '<div style="font-size:11px;font-weight:600;color:#555;'
+                        'text-transform:uppercase;letter-spacing:0.6px;margin-bottom:-8px;">'
+                        '🔍  Zoom window</div>',
+                        unsafe_allow_html=True
+                    )
                     hours = st.slider(
-                        "🔍 Zoom window",
+                        "zoom_hidden",
                         min_value=1,
                         max_value=avail_hours,
                         value=avail_hours,
                         step=1,
-                        format="%d h",
-                        help="Drag to zoom into the last N hours of the selected day"
+                        label_visibility="collapsed",
                     )
-                with zoom_col2:
+                with z_right:
                     st.markdown(
-                        f'<div style="padding-top:28px;font-size:22px;font-weight:700;color:#1a73e8;text-align:center;">'
-                        f'{hours}h</div>',
+                        f'<div style="padding-top:34px;font-size:11px;font-weight:600;'
+                        f'color:#888;text-align:center;text-transform:uppercase;letter-spacing:0.5px;">'
+                        f'{avail_hours}h</div>',
                         unsafe_allow_html=True
                     )
+
+                # Prominent selected-hours badge below the slider
+                pct = int((hours / avail_hours) * 100)
+                st.markdown(
+                    f'<div style="display:flex;align-items:center;gap:12px;'
+                    f'background:#f0f4ff;border:1px solid #c5d3f5;border-radius:10px;'
+                    f'padding:7px 16px;margin-top:2px;margin-bottom:6px;">'
+                    f'<div style="font-size:28px;font-weight:900;color:#1a73e8;line-height:1;">{hours}h</div>'
+                    f'<div>'
+                    f'<div style="font-size:12px;font-weight:700;color:#333;">'
+                    f'Showing last {hours} hour{"s" if hours != 1 else ""} of {period_label}</div>'
+                    f'<div style="font-size:11px;color:#888;margin-top:1px;">'
+                    f'{pct}% of available day data</div>'
+                    f'</div>'
+                    f'</div>',
+                    unsafe_allow_html=True
+                )
                 chart_df = chart_df[chart_df["Timestamp"] >= max_ts - timedelta(hours=hours)].copy()
 
         # Convert target range for display
