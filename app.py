@@ -558,6 +558,11 @@ with tab_chart:
 
         # ── Calendar date picker (Day view only) ──────────────────────────────────
         if st.session_state.nav_view == "day" and available_dates:
+            # Sync the calendar widget value to the current anchor_date whenever
+            # it drifts (e.g. after Back/Forward button clicks)
+            if st.session_state.get("cal_picker") != anchor_date:
+                st.session_state["cal_picker"] = anchor_date
+
             cal_col1, cal_col2 = st.columns([1, 3])
             with cal_col1:
                 st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to date:</div>',
@@ -565,7 +570,6 @@ with tab_chart:
             with cal_col2:
                 picked = st.date_input(
                     "jump_date",
-                    value=anchor_date,
                     min_value=data_min_date,
                     max_value=data_max_date,
                     label_visibility="collapsed",
