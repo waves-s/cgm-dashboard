@@ -124,6 +124,7 @@ for key, default in {
     "latest_reading": None,
     "nav_offset_days": 0,   # 0 = today/latest, negative = days back
     "nav_view": "day",      # "day" or "week"
+    "history_data": [],     # extended history from glucoseHistory endpoint
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -200,6 +201,31 @@ def fetch_data(patient):
         st.error(f"Error fetching data: {e}")
         return False
 
+def fetch_extended_history(num_periods: int = 5, period_days: int = 14):
+    """Fetch extended glucose history via the glucoseHistory endpoint.
+    Returns a list of dicts with 'timestamp' and 'value_in_mg_per_dl'.
+    """
+    try:
+        api = st.session_state.api
+        import requests as _req
+        url = f"{api.api_url}/glucoseHistory?numPeriods={num_periods}&period={period_days}"
+        headers = api._get_headers()
+        r = _req.get(url, headers=headers)
+        r.raise_for_status()
+        data = r.json()
+        rows = []
+        for period in data.get("data", {}).get("periods", []):
+            for entry in period.get("data", []):
+                ts_raw = entry.get("FactoryTimestamp") or entry.get("Timestamp")
+                val    = entry.get("Value")  # mg/dL in this endpoint
+                if ts_raw and val is not None:
+                    rows.append({"timestamp": ts_raw, "value_in_mg_per_dl": float(val)})
+        st.session_state.history_data = rows
+        return True, len(rows)
+    except Exception as e:
+        return False, str(e)
+
+
 def readings_to_df(readings):
     if not readings:
         return pd.DataFrame()
@@ -218,6 +244,20 @@ def readings_to_df(readings):
     df = pd.DataFrame(rows)
     df["Timestamp"] = pd.to_datetime(df["Timestamp"], utc=True).dt.tz_localize(None)
     df["Glucose_mmol"] = (df["Glucose_mg"] * MG_TO_MMOL).round(1)
+    return df.sort_values("Timestamp")
+
+
+def history_to_df(history_rows):
+    """Convert extended history dicts to a DataFrame compatible with readings_to_df output."""
+    if not history_rows:
+        return pd.DataFrame()
+    df = pd.DataFrame(history_rows)
+    df.rename(columns={"timestamp": "Timestamp", "value_in_mg_per_dl": "Glucose_mg"}, inplace=True)
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"], utc=True, errors="coerce").dt.tz_localize(None)
+    df = df.dropna(subset=["Timestamp", "Glucose_mg"])
+    df["Glucose_mmol"] = (df["Glucose_mg"] * MG_TO_MMOL).round(1)
+    df["Is High"] = False
+    df["Is Low"]  = False
     return df.sort_values("Timestamp")
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -302,6 +342,24 @@ with st.sidebar:
 
         if st.session_state.last_update:
             st.caption(f"Last fetched: {st.session_state.last_update.strftime('%H:%M:%S')}")
+
+        st.markdown("---")
+
+        # ── Extended History ───────────────────────────────────────────────────
+        st.markdown("### 📅 Extended History")
+        st.caption("Load up to 70+ days of historical data via the LibreView API.")
+        hist_periods = st.slider("Periods × 14 days", min_value=1, max_value=10, value=5, step=1,
+                                  help="Each period = 14 days. 5 periods = ~70 days.")
+        if st.button("Load Extended History", use_container_width=True):
+            with st.spinner(f"Fetching {hist_periods * 14} days of history…"):
+                ok, result = fetch_extended_history(num_periods=hist_periods, period_days=14)
+            if ok:
+                st.success(f"Loaded {result:,} readings ({hist_periods * 14} days)")
+                st.rerun()
+            else:
+                st.warning(f"Extended history unavailable: {result}")
+        if st.session_state.history_data:
+            st.caption(f"📂 {len(st.session_state.history_data):,} extended readings loaded")
 
         st.markdown("---")
         if st.button("Logout", use_container_width=True):
@@ -414,30 +472,41 @@ tab_chart, tab_readings, tab_stats = st.tabs(["📈 Trend Chart", "📋 All Read
 
 # ── Tab 1: Chart ──────────────────────────────────────────────────────────────
 with tab_chart:
-    # Combine graph (12h) + logbook (14d) for the widest possible window
+    # Combine graph (12h) + logbook (14d) + extended history for the widest possible window
     all_chart_readings = list(st.session_state.graph_data or []) + list(st.session_state.logbook_data or [])
-    full_df = readings_to_df(all_chart_readings)
+    recent_df  = readings_to_df(all_chart_readings)
+    hist_df    = history_to_df(st.session_state.history_data or [])
+    if not recent_df.empty and not hist_df.empty:
+        full_df = pd.concat([recent_df, hist_df], ignore_index=True)
+    elif not hist_df.empty:
+        full_df = hist_df
+    else:
+        full_df = recent_df
     if not full_df.empty:
         full_df = full_df.drop_duplicates("Timestamp").sort_values("Timestamp")
 
-    # For week view, use only logbook data so the full 14-day range is available
+    # For week/calendar view, prefer extended history if available, else logbook
     logbook_df = readings_to_df(list(st.session_state.logbook_data or []))
     if not logbook_df.empty:
         logbook_df = logbook_df.drop_duplicates("Timestamp").sort_values("Timestamp")
+    wide_df = full_df  # includes extended history
 
     if full_df.empty:
         st.info("No chart data available. Click Refresh Now in the sidebar.")
     else:
         # ── Time Navigation Controls ──────────────────────────────────────────
+        # Determine available date range across all data sources
+        data_min_date = wide_df["Timestamp"].min().date()
+        data_max_date = wide_df["Timestamp"].max().date()
+        available_dates = sorted(wide_df["Timestamp"].dt.date.unique())
+
         nav_col1, nav_col2, nav_col3, nav_col4, nav_col5, nav_col6 = st.columns([1.2, 1, 1, 1, 1, 2])
         with nav_col1:
             view_mode = st.radio("View", ["Day", "Week"], horizontal=True,
                                   index=0 if st.session_state.nav_view == "day" else 1,
                                   key="view_mode_radio")
             st.session_state.nav_view = view_mode.lower()
-        # Determine the data date range
-        data_min_date = full_df["Timestamp"].min().date()
-        data_max_date = full_df["Timestamp"].max().date()
+
         if st.session_state.nav_view == "day":
             min_offset = -(data_max_date - data_min_date).days
         else:
@@ -445,6 +514,7 @@ with tab_chart:
         # Clamp offset
         st.session_state.nav_offset_days = max(min_offset, min(0, st.session_state.nav_offset_days))
         offset = st.session_state.nav_offset_days
+
         with nav_col2:
             st.write("")
             if st.button("⏮ Oldest", use_container_width=True):
@@ -466,6 +536,7 @@ with tab_chart:
             if st.button("Latest ⏭", use_container_width=True):
                 st.session_state.nav_offset_days = 0
                 st.rerun()
+
         # Compute the window to display
         anchor_date = data_max_date + timedelta(days=st.session_state.nav_offset_days)
         if st.session_state.nav_view == "day":
@@ -478,14 +549,35 @@ with tab_chart:
             window_start = datetime.combine(week_start, datetime.min.time())
             window_end   = datetime.combine(week_end,   datetime.max.time())
             period_label = f"Week of {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
+
         with nav_col6:
             st.markdown(
                 f'<div style="padding-top:28px;font-size:15px;font-weight:600;color:#333;">📅 {period_label}</div>',
                 unsafe_allow_html=True
             )
 
-        # Use appropriate data source: full (graph+logbook) for day, logbook-only for week
-        source_df = full_df if st.session_state.nav_view == "day" else (logbook_df if not logbook_df.empty else full_df)
+        # ── Calendar date picker (Day view only) ──────────────────────────────────
+        if st.session_state.nav_view == "day" and available_dates:
+            cal_col1, cal_col2 = st.columns([1, 3])
+            with cal_col1:
+                st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to date:</div>',
+                            unsafe_allow_html=True)
+            with cal_col2:
+                picked = st.date_input(
+                    "jump_date",
+                    value=anchor_date,
+                    min_value=data_min_date,
+                    max_value=data_max_date,
+                    label_visibility="collapsed",
+                    key="cal_picker",
+                )
+                if picked != anchor_date:
+                    new_offset = (picked - data_max_date).days
+                    st.session_state.nav_offset_days = max(min_offset, min(0, new_offset))
+                    st.rerun()
+
+        # Use appropriate data source
+        source_df = wide_df
 
         chart_df = source_df[
             (source_df["Timestamp"] >= window_start) &
@@ -608,7 +700,7 @@ with tab_chart:
                     margin=dict(l=0, r=60, t=20, b=60),
                     legend=dict(orientation="h", y=1.05),
                     xaxis=dict(
-                        rangeslider=dict(visible=True, thickness=0.06),
+                        rangeslider=dict(visible=False),
                         rangeselector=dict(
                             buttons=[
                                 dict(count=1,  label="1h",  step="hour",  stepmode="backward"),
@@ -619,8 +711,15 @@ with tab_chart:
                             ],
                             bgcolor="#f0f4ff", activecolor="#1a73e8",
                             font=dict(size=11),
+                            x=0, y=1.08,
+                            xanchor="left",
                         ),
                     ),
+                    annotations=[
+                        dict(text="<b>Zoom:</b>", x=0, y=1.12, xref="paper", yref="paper",
+                             showarrow=False, font=dict(size=12, color="#555"),
+                             xanchor="left"),
+                    ],
                 )
 
             else:
@@ -672,7 +771,7 @@ with tab_chart:
                     margin=dict(l=0, r=0, t=20, b=60),
                     showlegend=False,
                     xaxis=dict(
-                        rangeslider=dict(visible=True, thickness=0.06),
+                        rangeslider=dict(visible=False),
                         rangeselector=dict(
                             buttons=[
                                 dict(count=1,  label="1h",  step="hour",  stepmode="backward"),
@@ -683,8 +782,15 @@ with tab_chart:
                             ],
                             bgcolor="#f0f4ff", activecolor="#1a73e8",
                             font=dict(size=11),
+                            x=0, y=1.08,
+                            xanchor="left",
                         ),
                     ),
+                    annotations=[
+                        dict(text="<b>Zoom:</b>", x=0, y=1.12, xref="paper", yref="paper",
+                             showarrow=False, font=dict(size=12, color="#555"),
+                             xanchor="left"),
+                    ],
                 )
 
             st.plotly_chart(fig, use_container_width=True)
