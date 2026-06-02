@@ -149,9 +149,13 @@ def readings_to_df(readings):
         return pd.DataFrame()
     rows = []
     for r in readings:
+        # Always use value_in_mg_per_dl as the authoritative mg/dL source.
+        # The 'value' field reflects the account's display unit (mmol/L for CA accounts)
+        # so it must NOT be used as mg/dL.
+        mg_val = r.value_in_mg_per_dl if r.value_in_mg_per_dl else r.value
         rows.append({
             "Timestamp": r.timestamp,
-            "Glucose_mg": r.value,
+            "Glucose_mg": mg_val,
             "Is High": r.is_high,
             "Is Low":  r.is_low,
         })
@@ -292,7 +296,9 @@ if latest is None:
     st.stop()
 
 # ─── Current Reading Banner ───────────────────────────────────────────────────
-status_label, glucose_class, badge_class = glucose_status(latest.value, target_low_mg, target_high_mg)
+# Use value_in_mg_per_dl as the authoritative base for all calculations
+latest_mg = latest.value_in_mg_per_dl if latest.value_in_mg_per_dl else latest.value
+status_label, glucose_class, badge_class = glucose_status(latest_mg, target_low_mg, target_high_mg)
 trend_text = TREND_LABELS.get(latest.trend, "→") if hasattr(latest, "trend") else "→"
 
 # Format reading timestamp (strip UTC offset for display)
@@ -303,14 +309,14 @@ col_val, col_trend, col_status, col_last = st.columns([2, 2, 2, 3])
 
 with col_val:
     if unit_choice == "mg/dL":
-        display_val = f"{latest.value:.0f}"
+        display_val = f"{latest_mg:.0f}"
         display_unit = "mg/dL"
     elif unit_choice == "mmol/L":
-        display_val = f"{mg_to_mmol(latest.value):.1f}"
+        display_val = f"{mg_to_mmol(latest_mg):.1f}"
         display_unit = "mmol/L"
     else:  # Both
-        display_val = f"{latest.value:.0f}"
-        display_unit = f"mg/dL &nbsp;|&nbsp; {mg_to_mmol(latest.value):.1f} mmol/L"
+        display_val = f"{latest_mg:.0f}"
+        display_unit = f"mg/dL &nbsp;|&nbsp; {mg_to_mmol(latest_mg):.1f} mmol/L"
 
     st.markdown(
         f'<div class="glucose-display {glucose_class}">{display_val}</div>'
@@ -339,6 +345,11 @@ with col_last:
         f'</div>',
         unsafe_allow_html=True
     )
+    # Also show mmol/L equivalent when in mg/dL mode and vice versa
+    if unit_choice == "mg/dL":
+        st.caption(f"≈ {mg_to_mmol(latest_mg):.1f} mmol/L")
+    elif unit_choice == "mmol/L":
+        st.caption(f"≈ {latest_mg:.0f} mg/dL")
 
 st.markdown("---")
 
@@ -427,11 +438,30 @@ with tab_chart:
         if chart_df.empty:
             st.info(f"No readings found for {period_label}.")
         else:
-            # Within-window hour slider (only for day view)
+            # Within-window hour zoom (only for day view)
             if st.session_state.nav_view == "day":
-                hours = st.slider("Zoom: show last N hours of this day",
-                                  min_value=1, max_value=24, value=24, step=1)
                 max_ts = chart_df["Timestamp"].max()
+                min_ts = chart_df["Timestamp"].min()
+                avail_hours = max(1, int((max_ts - min_ts).total_seconds() / 3600) + 1)
+                avail_hours = min(avail_hours, 24)
+
+                zoom_col1, zoom_col2 = st.columns([3, 1])
+                with zoom_col1:
+                    hours = st.slider(
+                        "🔍 Zoom window",
+                        min_value=1,
+                        max_value=avail_hours,
+                        value=avail_hours,
+                        step=1,
+                        format="%d h",
+                        help="Drag to zoom into the last N hours of the selected day"
+                    )
+                with zoom_col2:
+                    st.markdown(
+                        f'<div style="padding-top:28px;font-size:22px;font-weight:700;color:#1a73e8;text-align:center;">'
+                        f'{hours}h</div>',
+                        unsafe_allow_html=True
+                    )
                 chart_df = chart_df[chart_df["Timestamp"] >= max_ts - timedelta(hours=hours)].copy()
 
         # Convert target range for display
