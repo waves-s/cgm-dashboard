@@ -108,11 +108,17 @@ hr { border-top: 1px solid #e0e0e0; margin: 16px 0; }
 footer {visibility: hidden;}
 
 /* ── Compact Sidebar ── */
+section[data-testid="stSidebar"] {
+    min-width: 200px !important;
+    max-width: 220px !important;
+    width: 220px !important;
+}
 section[data-testid="stSidebar"] > div:first-child {
     padding-top: 0.5rem !important;
     padding-bottom: 0.5rem !important;
-    padding-left: 0.75rem !important;
-    padding-right: 0.75rem !important;
+    padding-left: 0.6rem !important;
+    padding-right: 0.6rem !important;
+    width: 220px !important;
 }
 section[data-testid="stSidebar"] .stMarkdown p,
 section[data-testid="stSidebar"] .stMarkdown h3 {
@@ -273,14 +279,19 @@ def readings_to_df(readings):
         # The 'value' field reflects the account's display unit (mmol/L for CA accounts)
         # so it must NOT be used as mg/dL.
         mg_val = r.value_in_mg_per_dl if r.value_in_mg_per_dl else r.value
+        # Use factory_timestamp (UTC-tagged) so timezone conversion is correct.
+        # 'timestamp' is a naive local datetime — treating it as UTC shifts readings
+        # by the user's UTC offset, collapsing multi-day data into a single day.
+        ts = r.factory_timestamp if hasattr(r, 'factory_timestamp') and r.factory_timestamp else r.timestamp
         rows.append({
-            "Timestamp": r.timestamp,
+            "Timestamp": ts,
             "Glucose_mg": mg_val,
             "Is High": r.is_high,
             "Is Low":  r.is_low,
         })
     df = pd.DataFrame(rows)
-    df["Timestamp"] = pd.to_datetime(df["Timestamp"], utc=True).dt.tz_localize(None)
+    # factory_timestamp is UTC-aware; convert to UTC then drop tz for naive comparison
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"], utc=True).dt.tz_convert("UTC").dt.tz_localize(None)
     df["Glucose_mmol"] = (df["Glucose_mg"] * MG_TO_MMOL).round(1)
     return df.sort_values("Timestamp")
 
