@@ -130,11 +130,11 @@ for key, default in {
 
 # ─── Helper Functions ──────────────────────────────────────────────────────────
 TREND_LABELS = {
-    Trend.DOWN_FAST: "Falling Fast ↓↓",
-    Trend.DOWN_SLOW: "Falling ↘",
-    Trend.STABLE:    "Stable →",
-    Trend.UP_SLOW:   "Rising ↗",
-    Trend.UP_FAST:   "Rising Fast ↑↑",
+    Trend.DOWN_FAST: "↓↓",
+    Trend.DOWN_SLOW: "↘",
+    Trend.STABLE:    "→",
+    Trend.UP_SLOW:   "↗",
+    Trend.UP_FAST:   "↑↑",
 }
 
 def mg_to_mmol(v):
@@ -420,6 +420,11 @@ with tab_chart:
     if not full_df.empty:
         full_df = full_df.drop_duplicates("Timestamp").sort_values("Timestamp")
 
+    # For week view, use only logbook data so the full 14-day range is available
+    logbook_df = readings_to_df(list(st.session_state.logbook_data or []))
+    if not logbook_df.empty:
+        logbook_df = logbook_df.drop_duplicates("Timestamp").sort_values("Timestamp")
+
     if full_df.empty:
         st.info("No chart data available. Click Refresh Now in the sidebar.")
     else:
@@ -478,15 +483,27 @@ with tab_chart:
                 f'<div style="padding-top:28px;font-size:15px;font-weight:600;color:#333;">📅 {period_label}</div>',
                 unsafe_allow_html=True
             )
-        chart_df = full_df[
-            (full_df["Timestamp"] >= window_start) &
-            (full_df["Timestamp"] <= window_end)
+
+        # Use appropriate data source: full (graph+logbook) for day, logbook-only for week
+        source_df = full_df if st.session_state.nav_view == "day" else (logbook_df if not logbook_df.empty else full_df)
+
+        chart_df = source_df[
+            (source_df["Timestamp"] >= window_start) &
+            (source_df["Timestamp"] <= window_end)
         ].copy()
         if chart_df.empty:
             st.info(f"No readings found for {period_label}.")
         else:
-            # Within-window hour zoom (only for day view)
+            # Day view: show date label + hour zoom slider
             if st.session_state.nav_view == "day":
+                date_str = anchor_date.strftime("%A, %B %d, %Y")
+                st.markdown(
+                    f'<div style="font-size:13px;font-weight:600;color:#1a73e8;'
+                    f'background:#f0f4ff;border:1px solid #c5d3f5;border-radius:8px;'
+                    f'padding:5px 14px;display:inline-block;margin-bottom:6px;">'
+                    f'📆 {date_str}</div>',
+                    unsafe_allow_html=True
+                )
                 max_ts = chart_df["Timestamp"].max()
                 min_ts = chart_df["Timestamp"].min()
                 avail_hours = max(1, int((max_ts - min_ts).total_seconds() / 3600) + 1)
@@ -500,7 +517,7 @@ with tab_chart:
                         value=avail_hours,
                         step=1,
                         format="%d h",
-                        help="Drag to zoom into the last N hours of the selected day"
+                        help="Drag to zoom into a specific window within the selected day"
                     )
                 with zoom_col2:
                     st.markdown(
@@ -586,10 +603,24 @@ with tab_chart:
                         showgrid=False,
                     ),
                     hovermode="x unified",
-                    height=440,
+                    height=500,
                     template="plotly_white",
-                    margin=dict(l=0, r=60, t=20, b=0),
+                    margin=dict(l=0, r=60, t=20, b=60),
                     legend=dict(orientation="h", y=1.05),
+                    xaxis=dict(
+                        rangeslider=dict(visible=True, thickness=0.06),
+                        rangeselector=dict(
+                            buttons=[
+                                dict(count=1,  label="1h",  step="hour",  stepmode="backward"),
+                                dict(count=3,  label="3h",  step="hour",  stepmode="backward"),
+                                dict(count=6,  label="6h",  step="hour",  stepmode="backward"),
+                                dict(count=12, label="12h", step="hour",  stepmode="backward"),
+                                dict(step="all", label="All"),
+                            ],
+                            bgcolor="#f0f4ff", activecolor="#1a73e8",
+                            font=dict(size=11),
+                        ),
+                    ),
                 )
 
             else:
@@ -636,10 +667,24 @@ with tab_chart:
                     xaxis_title="Time",
                     yaxis=dict(title=y_label, range=y_range),
                     hovermode="x unified",
-                    height=440,
+                    height=500,
                     template="plotly_white",
-                    margin=dict(l=0, r=0, t=20, b=0),
+                    margin=dict(l=0, r=0, t=20, b=60),
                     showlegend=False,
+                    xaxis=dict(
+                        rangeslider=dict(visible=True, thickness=0.06),
+                        rangeselector=dict(
+                            buttons=[
+                                dict(count=1,  label="1h",  step="hour",  stepmode="backward"),
+                                dict(count=3,  label="3h",  step="hour",  stepmode="backward"),
+                                dict(count=6,  label="6h",  step="hour",  stepmode="backward"),
+                                dict(count=12, label="12h", step="hour",  stepmode="backward"),
+                                dict(step="all", label="All"),
+                            ],
+                            bgcolor="#f0f4ff", activecolor="#1a73e8",
+                            font=dict(size=11),
+                        ),
+                    ),
                 )
 
             st.plotly_chart(fig, use_container_width=True)
