@@ -736,7 +736,7 @@ with tab_chart:
                         ),
                     ),
                     annotations=[
-                        dict(text="<b>Zoom:</b>", x=0.0, y=1.08, xref="paper", yref="paper",
+                        dict(text="<b>Zoom:</b>", x=0.0, y=1.10, xref="paper", yref="paper",
                              showarrow=False, font=dict(size=12, color="#555"),
                              xanchor="left", yanchor="middle"),
                     ],
@@ -806,7 +806,7 @@ with tab_chart:
                         ),
                     ),
                     annotations=[
-                        dict(text="<b>Zoom:</b>", x=0.0, y=1.08, xref="paper", yref="paper",
+                        dict(text="<b>Zoom:</b>", x=0.0, y=1.10, xref="paper", yref="paper",
                              showarrow=False, font=dict(size=12, color="#555"),
                              xanchor="left", yanchor="middle"),
                     ],
