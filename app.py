@@ -22,6 +22,18 @@ st.set_page_config(
 st.markdown("""
 <style>
 .main { background-color: #ffffff; }
+.main .block-container {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    max-width: 100% !important;
+}
+/* Remove the large top gap Streamlit adds above the first element */
+.main .block-container > div:first-child {
+    margin-top: 0 !important;
+}
+h1 { margin-top: 0 !important; margin-bottom: 0.3rem !important; font-size: 1.4rem !important; }
+h2 { margin-top: 0.2rem !important; margin-bottom: 0.2rem !important; }
+hr { margin: 6px 0 !important; }
 div[data-testid="metric-container"] {
     background-color: #f8f9fa;
     border: 1px solid #e0e0e0;
