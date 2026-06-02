@@ -590,7 +590,7 @@ with tab_chart:
         if chart_df.empty:
             st.info(f"No readings found for {period_label}.")
         else:
-            # Day view: show date label + hour zoom slider
+            # Day view: show date label only
             if st.session_state.nav_view == "day":
                 date_str = anchor_date.strftime("%A, %B %d, %Y")
                 st.markdown(
@@ -600,28 +600,6 @@ with tab_chart:
                     f'📆 {date_str}</div>',
                     unsafe_allow_html=True
                 )
-                max_ts = chart_df["Timestamp"].max()
-                min_ts = chart_df["Timestamp"].min()
-                avail_hours = max(1, int((max_ts - min_ts).total_seconds() / 3600) + 1)
-                avail_hours = min(avail_hours, 24)
-                zoom_col1, zoom_col2 = st.columns([3, 1])
-                with zoom_col1:
-                    hours = st.slider(
-                        "🔍 Zoom window",
-                        min_value=1,
-                        max_value=avail_hours,
-                        value=avail_hours,
-                        step=1,
-                        format="%d h",
-                        help="Drag to zoom into a specific window within the selected day"
-                    )
-                with zoom_col2:
-                    st.markdown(
-                        f'<div style="padding-top:28px;font-size:22px;font-weight:700;color:#1a73e8;text-align:center;">'
-                        f'{hours}h</div>',
-                        unsafe_allow_html=True
-                    )
-                chart_df = chart_df[chart_df["Timestamp"] >= max_ts - timedelta(hours=hours)].copy()
 
         # Convert target range for display
         target_low_mmol  = round(target_low_mg  * MG_TO_MMOL, 1)
