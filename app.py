@@ -693,14 +693,14 @@ with tab_chart:
                             ],
                             bgcolor="#f0f4ff", activecolor="#1a73e8",
                             font=dict(size=11),
-                            x=0, y=1.08,
+                            x=0.08, y=1.08,
                             xanchor="left",
                         ),
                     ),
                     annotations=[
-                        dict(text="<b>Zoom:</b>", x=0, y=1.12, xref="paper", yref="paper",
+                        dict(text="<b>Zoom:</b>", x=0.0, y=1.08, xref="paper", yref="paper",
                              showarrow=False, font=dict(size=12, color="#555"),
-                             xanchor="left"),
+                             xanchor="left", yanchor="middle"),
                     ],
                 )
 
@@ -763,14 +763,14 @@ with tab_chart:
                             ],
                             bgcolor="#f0f4ff", activecolor="#1a73e8",
                             font=dict(size=11),
-                            x=0, y=1.08,
+                            x=0.08, y=1.08,
                             xanchor="left",
                         ),
                     ),
                     annotations=[
-                        dict(text="<b>Zoom:</b>", x=0, y=1.12, xref="paper", yref="paper",
+                        dict(text="<b>Zoom:</b>", x=0.0, y=1.08, xref="paper", yref="paper",
                              showarrow=False, font=dict(size=12, color="#555"),
-                             xanchor="left"),
+                             xanchor="left", yanchor="middle"),
                     ],
                 )
 
