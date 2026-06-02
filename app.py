@@ -469,6 +469,31 @@ with tab_chart:
         target_high_mmol = round(target_high_mg * MG_TO_MMOL, 1)
 
         if not chart_df.empty:
+            # ── Dynamic Y-axis: centre the target range with equal padding ──────
+            # Compute a Y range that places the target band in the vertical middle,
+            # while also ensuring all actual data points are visible.
+            def centered_yrange_mg(tgt_lo, tgt_hi, data_min, data_max):
+                """Return (y_min, y_max) that centres [tgt_lo, tgt_hi] in the chart
+                and includes all data points with comfortable padding."""
+                tgt_centre = (tgt_lo + tgt_hi) / 2
+                tgt_half   = (tgt_hi - tgt_lo) / 2
+                # Half-span needed to show target range + 50% padding on each side
+                half_span  = max(tgt_half * 3.0, 60)   # at least ±60 mg/dL
+                # Expand to include actual data
+                half_span  = max(half_span, tgt_centre - data_min + 20,
+                                            data_max - tgt_centre + 20)
+                y_min = tgt_centre - half_span
+                y_max = tgt_centre + half_span
+                return y_min, y_max
+
+            data_min_mg = chart_df["Glucose_mg"].min()
+            data_max_mg = chart_df["Glucose_mg"].max()
+            y_min_mg, y_max_mg = centered_yrange_mg(
+                target_low_mg, target_high_mg, data_min_mg, data_max_mg
+            )
+            y_min_mmol = round(y_min_mg * MG_TO_MMOL, 1)
+            y_max_mmol = round(y_max_mg * MG_TO_MMOL, 1)
+
             fig = go.Figure()
 
             if unit_choice == "Both":
@@ -506,10 +531,10 @@ with tab_chart:
                               annotation_text=f"High ({target_high_mg} mg/dL)", annotation_position="top right")
                 fig.update_layout(
                     xaxis_title="Time",
-                    yaxis=dict(title="Glucose (mg/dL)", range=[40, 350], side="left"),
+                    yaxis=dict(title="Glucose (mg/dL)", range=[y_min_mg, y_max_mg], side="left"),
                     yaxis2=dict(
                         title="Glucose (mmol/L)",
-                        range=[round(40 * MG_TO_MMOL, 1), round(350 * MG_TO_MMOL, 1)],
+                        range=[y_min_mmol, y_max_mmol],
                         overlaying="y",
                         side="right",
                         showgrid=False,
@@ -526,7 +551,7 @@ with tab_chart:
                 if unit_choice == "mmol/L":
                     y_col     = "Glucose_mmol"
                     y_label   = "Glucose (mmol/L)"
-                    y_range   = [round(40 * MG_TO_MMOL, 1), round(350 * MG_TO_MMOL, 1)]
+                    y_range   = [y_min_mmol, y_max_mmol]
                     tgt_low   = target_low_mmol
                     tgt_high  = target_high_mmol
                     low_ann   = f"Low ({target_low_mmol} mmol/L)"
@@ -535,7 +560,7 @@ with tab_chart:
                 else:
                     y_col     = "Glucose_mg"
                     y_label   = "Glucose (mg/dL)"
-                    y_range   = [40, 350]
+                    y_range   = [y_min_mg, y_max_mg]
                     tgt_low   = target_low_mg
                     tgt_high  = target_high_mg
                     low_ann   = f"Low ({target_low_mg} mg/dL)"
