@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import time
 from pylibrelinkup import PyLibreLinkUp, APIUrl
 from pylibrelinkup.exceptions import (
@@ -144,7 +144,8 @@ def readings_to_df(readings):
             "Is Low":  r.is_low,
         })
     df = pd.DataFrame(rows)
-    df["Timestamp"] = pd.to_datetime(df["Timestamp"])
+    # Parse timestamps and strip timezone info for consistent local-time comparison
+    df["Timestamp"] = pd.to_datetime(df["Timestamp"], utc=True).dt.tz_localize(None)
     return df.sort_values("Timestamp")
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -291,9 +292,10 @@ with tab_chart:
     if graph_df.empty:
         st.info("No chart data available.")
     else:
-        # Time range filter
-        hours = st.slider("Show last N hours", min_value=1, max_value=12, value=6, step=1)
-        cutoff = datetime.now() - timedelta(hours=hours)
+        # Time range filter — use the max timestamp in data as reference to avoid timezone drift
+        hours = st.slider("Show last N hours", min_value=1, max_value=12, value=12, step=1)
+        max_ts = graph_df["Timestamp"].max()
+        cutoff = max_ts - timedelta(hours=hours)
         chart_df = graph_df[graph_df["Timestamp"] >= cutoff]
 
         fig = go.Figure()
