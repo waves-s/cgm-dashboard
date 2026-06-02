@@ -128,17 +128,11 @@ hr { border-top: 1px solid #e0e0e0; margin: 16px 0; }
 footer {visibility: hidden;}
 
 /* ── Compact Sidebar ── */
-section[data-testid="stSidebar"] {
-    min-width: 200px !important;
-    max-width: 220px !important;
-    width: 220px !important;
-}
 section[data-testid="stSidebar"] > div:first-child {
     padding-top: 0.5rem !important;
     padding-bottom: 0.5rem !important;
-    padding-left: 0.6rem !important;
-    padding-right: 0.6rem !important;
-    width: 220px !important;
+    padding-left: 1rem !important;
+    padding-right: 1rem !important;
 }
 section[data-testid="stSidebar"] .stMarkdown p,
 section[data-testid="stSidebar"] .stMarkdown h3 {
