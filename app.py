@@ -633,7 +633,8 @@ with tab_chart:
             # while also ensuring all actual data points are visible.
             def centered_yrange_mg(tgt_lo, tgt_hi, data_min, data_max):
                 """Return (y_min, y_max) that centres [tgt_lo, tgt_hi] in the chart
-                and includes all data points with comfortable padding."""
+                and includes all data points with comfortable padding.
+                Y-axis minimum is clamped to 0 (glucose cannot be negative)."""
                 tgt_centre = (tgt_lo + tgt_hi) / 2
                 tgt_half   = (tgt_hi - tgt_lo) / 2
                 # Half-span needed to show target range + 50% padding on each side
@@ -641,7 +642,7 @@ with tab_chart:
                 # Expand to include actual data
                 half_span  = max(half_span, tgt_centre - data_min + 20,
                                             data_max - tgt_centre + 20)
-                y_min = tgt_centre - half_span
+                y_min = max(0, tgt_centre - half_span)  # never below 0
                 y_max = tgt_centre + half_span
                 return y_min, y_max
 
@@ -707,11 +708,10 @@ with tab_chart:
                         rangeslider=dict(visible=False),
                         rangeselector=dict(
                             buttons=[
-                                dict(count=1,  label="1h",  step="hour",  stepmode="backward"),
                                 dict(count=3,  label="3h",  step="hour",  stepmode="backward"),
                                 dict(count=6,  label="6h",  step="hour",  stepmode="backward"),
                                 dict(count=12, label="12h", step="hour",  stepmode="backward"),
-                                dict(step="all", label="All"),
+                                dict(count=24, label="24h", step="hour",  stepmode="backward"),
                             ],
                             bgcolor="#f0f4ff", activecolor="#1a73e8",
                             font=dict(size=11),
@@ -778,11 +778,10 @@ with tab_chart:
                         rangeslider=dict(visible=False),
                         rangeselector=dict(
                             buttons=[
-                                dict(count=1,  label="1h",  step="hour",  stepmode="backward"),
                                 dict(count=3,  label="3h",  step="hour",  stepmode="backward"),
                                 dict(count=6,  label="6h",  step="hour",  stepmode="backward"),
                                 dict(count=12, label="12h", step="hour",  stepmode="backward"),
-                                dict(step="all", label="All"),
+                                dict(count=24, label="24h", step="hour",  stepmode="backward"),
                             ],
                             bgcolor="#f0f4ff", activecolor="#1a73e8",
                             font=dict(size=11),
