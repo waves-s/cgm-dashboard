@@ -143,13 +143,17 @@ for key, default in {
     "last_update": None,
     "graph_data": [],
     "logbook_data": [],
+    "logbook_cache": [],      # NEW: Cache logbook data for fallback when rate limited
+    "logbook_cache_time": 0,  # NEW: Timestamp of last successful logbook fetch
     "latest_reading": None,
     "nav_offset_days": 0,
     "nav_view": "day",
     "cache_df": None,         # Full merged DataFrame from cache.json
-    "show_last_24h": True,    # Default: show last 24h on first load
+    "show_last_24h": False,   # Default: show full available data (14 days from logbook)
     "auto_login_attempted": False,  # Only try auto-login once per session
     "rate_limit_until": 0,            # Timestamp when rate limit expires
+    "user_email": None,      # NEW: Store logged-in user email
+    "session_start_time": None,  # NEW: Track session start time
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -183,6 +187,7 @@ def glucose_status(value_mg: float, low_mg: float, high_mg: float):
         return "IN RANGE", "glucose-normal", "badge-normal"
 
 def authenticate(email: str, password: str, region: str):
+    """Enhanced authentication with better error handling and automatic data fetching."""
     try:
         api_url = APIUrl[region]
         api = PyLibreLinkUp(email=email, password=password, api_url=api_url)
@@ -195,39 +200,77 @@ def authenticate(email: str, password: str, region: str):
         st.session_state.api = api
         st.session_state.authenticated = True
         st.session_state.patients = patients
+        st.session_state.user_email = email  # NEW: Store user email
+        st.session_state.session_start_time = datetime.now(CALGARY_TZ)  # NEW: Track session start
         if patients:
             st.session_state.selected_patient = patients[0]
+            # NEW: Automatically fetch data after successful login
+            try:
+                fetch_data(patients[0])
+            except Exception:
+                pass  # Data fetch can fail silently; user can refresh manually
         return True, None
     except AuthenticationError as e:
-        return False, f"Authentication failed: {e}"
+        error_msg = "Invalid email or password. Please check your credentials."
+        return False, error_msg
     except PrivacyPolicyError:
         return False, "Please accept the Privacy Policy in the LibreLink app first."
     except TermsOfUseError:
         return False, "Please accept the Terms of Use in the LibreLink app first."
     except Exception as e:
-        return False, f"Unexpected error: {e}"
+        error_msg = f"Connection error: {str(e)[:100]}"
+        return False, error_msg
 
 def fetch_data(patient):
     try:
         api = st.session_state.api
         pid = patient.patient_id  # Use patient_id (connection UUID), not id
         latest  = api.latest(patient_identifier=pid)
-        graph   = api.graph(patient_identifier=pid)
+        
+        # Fetch logbook FIRST (14 days) - more important than graph (12 hours)
+        logbook = []
         try:
             logbook = api.logbook(patient_identifier=pid)
-        except Exception:
-            logbook = []
+            print(f"DEBUG: Successfully fetched logbook with {len(logbook)} readings")
+            # Cache the logbook data for fallback
+            st.session_state.logbook_cache = logbook
+            st.session_state.logbook_cache_time = datetime.now(CALGARY_TZ).timestamp()
+        except LLUAPIRateLimitError as e:
+            print(f"DEBUG: Logbook rate limited: {e}")
+            # Use cached logbook data as fallback
+            logbook = st.session_state.logbook_cache
+            print(f"DEBUG: Using cached logbook with {len(logbook)} readings")
+        except Exception as e:
+            print(f"DEBUG: Logbook fetch failed: {e}")
+            # Use cached logbook data as fallback
+            logbook = st.session_state.logbook_cache
+            print(f"DEBUG: Using cached logbook with {len(logbook)} readings (fallback)")
+        
+        # Fetch graph (12 hours) as fallback/supplement
+        graph = []
+        try:
+            graph = api.graph(patient_identifier=pid)
+            print(f"DEBUG: Successfully fetched graph with {len(graph)} readings")
+        except LLUAPIRateLimitError as e:
+            print(f"DEBUG: Graph rate limited: {e}")
+            # If both are rate limited, we'll handle it below
+        except Exception as e:
+            print(f"DEBUG: Graph fetch failed: {e}")
+        
         st.session_state.latest_reading = latest
         st.session_state.graph_data     = graph
         st.session_state.logbook_data   = logbook
         st.session_state.last_update    = datetime.now(CALGARY_TZ)
+        print(f"DEBUG: Final data - graph={len(graph)} readings, logbook={len(logbook)} readings")
         return True
     except LLUAPIRateLimitError as e:
         # Store when we're allowed to retry — suppress the warning from the UI
         st.session_state.rate_limit_until = datetime.now(CALGARY_TZ).timestamp() + (e.retry_after or 300)
+        print(f"DEBUG: Rate limit hit - retry after {e.retry_after or 300} seconds")
         return False
     except Exception as e:
         st.error(f"Error fetching data: {e}")
+        print(f"DEBUG: Unexpected error: {e}")
         return False
 
 def readings_to_df(readings):
@@ -551,6 +594,21 @@ with st.sidebar:
             lu = st.session_state.last_update
             tz_abbr = lu.strftime("%Z") if lu.tzinfo else "MT"
             st.caption(f"Last fetched: {lu.strftime('%H:%M:%S')} {tz_abbr}")
+        
+        # ── Data Status ───────────────────────────────────────────────────────
+        st.markdown("### 📊 Data Status")
+        graph_count = len(st.session_state.graph_data or [])
+        logbook_count = len(st.session_state.logbook_data or [])
+        total_count = graph_count + logbook_count
+        
+        if total_count > 0:
+            st.success(f"✅ Data loaded: {total_count} readings")
+            st.caption(f"Graph: {graph_count} | Logbook: {logbook_count}")
+        else:
+            st.warning("⚠️ No data fetched yet")
+            if st.session_state.logbook_cache:
+                cache_count = len(st.session_state.logbook_cache)
+                st.info(f"💾 Cached: {cache_count} readings")
 
     # Show cache status
     cache_df_info = load_cache_df()
@@ -640,14 +698,11 @@ if st.session_state.authenticated and st.session_state.selected_patient:
         if _rate_ok:
             with st.spinner("Loading latest readings…"):
                 fetch_data(st.session_state.selected_patient)
-            # Rerun so the chart renders with the freshly fetched graph_data
-            st.rerun()
     else:
         # Re-fetch on every page load, throttled to once every 60s
         elapsed = (datetime.now(CALGARY_TZ) - st.session_state.last_update).total_seconds()
         if elapsed >= 60 and _rate_ok:
             fetch_data(st.session_state.selected_patient)
-            st.rerun()
 
 # ─── Main Content ─────────────────────────────────────────────────────────────
 st.markdown(
@@ -742,6 +797,8 @@ with tab_chart:
                                   index=0 if st.session_state.nav_view == "day" else 1,
                                   key="view_mode_radio")
             st.session_state.nav_view = view_mode.lower()
+            
+            # Removed time range selector - showing full day data by default
 
         if st.session_state.nav_view == "day":
             min_offset = -(data_max_date - data_min_date).days
@@ -775,7 +832,7 @@ with tab_chart:
             if st.button("Latest ⏭", use_container_width=True):
                 st.session_state.nav_offset_days = 0
                 st.session_state.nav_view = "day"
-                st.session_state.show_last_24h = True
+                st.session_state.show_last_24h = False  # Show full day, not just 24 hours
                 st.rerun()
 
         anchor_date = data_max_date + timedelta(days=st.session_state.nav_offset_days)
