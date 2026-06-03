@@ -640,11 +640,14 @@ if st.session_state.authenticated and st.session_state.selected_patient:
         if _rate_ok:
             with st.spinner("Loading latest readings…"):
                 fetch_data(st.session_state.selected_patient)
+            # Rerun so the chart renders with the freshly fetched graph_data
+            st.rerun()
     else:
         # Re-fetch on every page load, throttled to once every 60s
         elapsed = (datetime.now(CALGARY_TZ) - st.session_state.last_update).total_seconds()
         if elapsed >= 60 and _rate_ok:
             fetch_data(st.session_state.selected_patient)
+            st.rerun()
 
 # ─── Main Content ─────────────────────────────────────────────────────────────
 st.markdown(
