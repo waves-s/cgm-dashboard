@@ -188,9 +188,13 @@ def authenticate(email: str, password: str, region: str):
 def fetch_data(patient):
     try:
         api = st.session_state.api
-        latest  = api.latest(patient)
-        graph   = api.graph(patient)
-        logbook = api.logbook(patient)
+        pid = patient.patient_id  # Use patient_id (connection UUID), not id
+        latest  = api.latest(patient_identifier=pid)
+        graph   = api.graph(patient_identifier=pid)
+        try:
+            logbook = api.logbook(patient_identifier=pid)
+        except Exception:
+            logbook = []
         st.session_state.latest_reading = latest
         st.session_state.graph_data     = graph
         st.session_state.logbook_data   = logbook
