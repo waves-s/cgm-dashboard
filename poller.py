@@ -82,27 +82,30 @@ def fetch_readings(client) -> list[dict]:
     readings = []
 
     try:
-        graph_data = client.graph(patient=patient)
-        # Current reading
-        if graph_data.current:
-            r = graph_data.current
+        # Use patient.patient_id (the connection UUID) as the identifier
+        graph_readings = client.graph(patient_identifier=patient.patient_id)
+        for r in graph_readings:
             readings.append({
                 "timestamp": r.factory_timestamp.isoformat(),
                 "value_mg_dl": float(r.value_in_mg_per_dl),
-                "trend": r.trend_arrow.name if hasattr(r.trend_arrow, 'name') else str(r.trend_arrow),
+                "trend": "",
                 "source": "live",
             })
-        # Historical readings from graph
-        if graph_data.data:
-            for r in graph_data.data:
-                readings.append({
-                    "timestamp": r.factory_timestamp.isoformat(),
-                    "value_mg_dl": float(r.value_in_mg_per_dl),
-                    "trend": r.trend_arrow.name if hasattr(r.trend_arrow, 'name') else str(r.trend_arrow),
-                    "source": "live",
-                })
     except Exception as e:
         print(f"Error fetching graph data: {e}")
+
+    # Also try latest reading
+    try:
+        latest = client.latest(patient_identifier=patient.patient_id)
+        if latest:
+            readings.append({
+                "timestamp": latest.factory_timestamp.isoformat(),
+                "value_mg_dl": float(latest.value_in_mg_per_dl),
+                "trend": latest.trend_arrow.name if hasattr(latest.trend_arrow, 'name') else str(latest.trend_arrow),
+                "source": "live",
+            })
+    except Exception as e:
+        print(f"Error fetching latest reading: {e}")
 
     return readings
 
