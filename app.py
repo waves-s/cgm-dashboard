@@ -522,7 +522,7 @@ with st.sidebar:
     st.markdown("### 🎯 Target Range")
     if unit_choice == "mmol/L":
         low_default  = 3.0
-        high_default = 6.0
+        high_default = 6.5
         low_mmol  = st.number_input("Low (mmol/L)",  min_value=1.0, max_value=10.0, value=low_default,  step=0.1, format="%.1f")
         high_mmol = st.number_input("High (mmol/L)", min_value=5.0, max_value=25.0, value=high_default, step=0.1, format="%.1f")
         target_low_mg  = round(low_mmol  / MG_TO_MMOL)
