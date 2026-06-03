@@ -10,6 +10,9 @@ import os
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
+from zoneinfo import ZoneInfo
+
+CALGARY_TZ = ZoneInfo("America/Edmonton")  # Calgary / Mountain Time
 
 from pylibrelinkup import PyLibreLinkUp, APIUrl
 from pylibrelinkup.exceptions import RedirectError
@@ -136,7 +139,9 @@ def main():
         print("ERROR: LIBREVIEW_EMAIL and LIBREVIEW_PASSWORD environment variables must be set.")
         sys.exit(1)
 
-    print(f"[{datetime.now(timezone.utc).isoformat()}] Starting CGM poll...")
+    now_utc = datetime.now(timezone.utc)
+    now_calgary = now_utc.astimezone(CALGARY_TZ)
+    print(f"[{now_utc.isoformat()}] Starting CGM poll... (Calgary: {now_calgary.strftime('%Y-%m-%d %H:%M:%S %Z')})")
 
     # Load existing cache
     cache = load_cache()
@@ -161,7 +166,7 @@ def main():
     # Merge and save
     merged = merge_readings(cache.get("readings", []), new_readings)
     cache["readings"] = merged
-    cache["last_updated"] = datetime.now(timezone.utc).isoformat()
+    cache["last_updated"] = datetime.now(CALGARY_TZ).isoformat()
     cache["source"] = "live_api"
 
     save_cache(cache)

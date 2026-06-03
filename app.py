@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 import json
 import io
 from pathlib import Path
@@ -114,6 +115,7 @@ section[data-testid="stSidebar"] .stButton > button {
 # ─── Constants ────────────────────────────────────────────────────────────────
 MG_TO_MMOL  = 0.0555
 CACHE_FILE  = Path(__file__).parent / "cache.json"
+CALGARY_TZ  = ZoneInfo("America/Edmonton")  # Calgary / Mountain Time (MDT/MST)
 
 # ─── Session State Initialization ─────────────────────────────────────────────
 for key, default in {
@@ -198,7 +200,7 @@ def fetch_data(patient):
         st.session_state.latest_reading = latest
         st.session_state.graph_data     = graph
         st.session_state.logbook_data   = logbook
-        st.session_state.last_update    = datetime.now()
+        st.session_state.last_update    = datetime.now(CALGARY_TZ)
         return True
     except LLUAPIRateLimitError as e:
         st.warning(f"Rate limited. Retry after {e.retry_after}s.")
@@ -221,7 +223,12 @@ def readings_to_df(readings):
             "Is Low":  r.is_low,
         })
     df = pd.DataFrame(rows)
-    df["Timestamp"] = pd.to_datetime(df["Timestamp"], utc=True).dt.tz_convert("UTC").dt.tz_localize(None)
+    # Convert UTC → Calgary (Mountain Time)
+    df["Timestamp"] = (
+        pd.to_datetime(df["Timestamp"], utc=True)
+        .dt.tz_convert(CALGARY_TZ)
+        .dt.tz_localize(None)  # drop tzinfo so Plotly/pandas treat as naive local time
+    )
     df["Glucose_mmol"] = (df["Glucose_mg"] * MG_TO_MMOL).round(1)
     return df.sort_values("Timestamp")
 
@@ -238,7 +245,12 @@ def load_cache_df() -> pd.DataFrame:
             return pd.DataFrame()
         df = pd.DataFrame(readings)
         df.rename(columns={"timestamp": "Timestamp", "value_mg_dl": "Glucose_mg"}, inplace=True)
-        df["Timestamp"] = pd.to_datetime(df["Timestamp"], utc=True, errors="coerce").dt.tz_localize(None)
+        # Timestamps in cache.json are stored as UTC ISO strings; convert to Calgary time
+        df["Timestamp"] = (
+            pd.to_datetime(df["Timestamp"], utc=True, errors="coerce")
+            .dt.tz_convert(CALGARY_TZ)
+            .dt.tz_localize(None)  # drop tzinfo for consistent naive-local treatment
+        )
         df = df.dropna(subset=["Timestamp", "Glucose_mg"])
         df["Glucose_mg"] = pd.to_numeric(df["Glucose_mg"], errors="coerce")
         df = df.dropna(subset=["Glucose_mg"])
@@ -263,7 +275,7 @@ def save_cache(df: pd.DataFrame):
             })
         data = {
             "readings": readings,
-            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "last_updated": datetime.now(CALGARY_TZ).isoformat(),
             "source": "merged",
         }
         with open(CACHE_FILE, "w") as f:
@@ -320,7 +332,15 @@ def parse_libreview_csv(uploaded_file) -> pd.DataFrame:
 
         # Build result DataFrame
         result = pd.DataFrame()
-        result["Timestamp"] = pd.to_datetime(df[ts_col], errors="coerce", dayfirst=False)
+        # LibreView CSV exports timestamps in the account's local time (Calgary/Mountain Time).
+        # Parse as naive, then localize to Calgary so they are consistent with API data.
+        raw_ts = pd.to_datetime(df[ts_col], errors="coerce", dayfirst=False)
+        result["Timestamp"] = (
+            raw_ts
+            .dt.tz_localize(CALGARY_TZ, ambiguous="infer", nonexistent="shift_forward")
+            .dt.tz_convert(CALGARY_TZ)
+            .dt.tz_localize(None)  # store as naive Calgary-local, matching API data
+        )
         result = result.dropna(subset=["Timestamp"])
 
         if glucose_col_mg:
@@ -445,7 +465,9 @@ with st.sidebar:
                 st.rerun()
 
         if st.session_state.last_update:
-            st.caption(f"Last fetched: {st.session_state.last_update.strftime('%H:%M:%S')}")
+            lu = st.session_state.last_update
+            tz_abbr = lu.strftime("%Z") if lu.tzinfo else "MT"
+            st.caption(f"Last fetched: {lu.strftime('%H:%M:%S')} {tz_abbr}")
 
         # Show cache status
         cache_df_info = load_cache_df()
@@ -497,7 +519,7 @@ if st.session_state.authenticated and st.session_state.selected_patient:
         with st.spinner("Loading latest readings…"):
             fetch_data(st.session_state.selected_patient)
     else:
-        elapsed = (datetime.now() - st.session_state.last_update).total_seconds()
+        elapsed = (datetime.now(CALGARY_TZ) - st.session_state.last_update).total_seconds()
         if elapsed >= refresh_interval * 60:
             fetch_data(st.session_state.selected_patient)
 
@@ -540,7 +562,10 @@ else:
 
 ts = latest.factory_timestamp if hasattr(latest, 'factory_timestamp') and latest.factory_timestamp else latest.timestamp
 if hasattr(ts, 'astimezone'):
-    reading_time_str = ts.strftime("%b %d, %Y  %H:%M:%S")
+    # Convert UTC reading time to Calgary (Mountain Time)
+    ts_calgary = ts.astimezone(CALGARY_TZ)
+    tz_abbr = ts_calgary.strftime("%Z")  # MDT or MST
+    reading_time_str = ts_calgary.strftime(f"%b %d, %Y  %H:%M:%S {tz_abbr}")
 else:
     reading_time_str = str(ts)
 
@@ -830,7 +855,7 @@ with tab_readings:
         all_df["Status"] = all_df["Glucose_mg"].apply(
             lambda v: "HIGH" if v > target_high_mg else ("LOW" if v < target_low_mg else "In Range")
         )
-        all_df["Time"] = all_df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M:%S")
+        all_df["Time"] = all_df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M") + " MT"
 
         display_df = all_df[["Time", "Glucose", "Status"]].copy()
 
