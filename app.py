@@ -74,6 +74,13 @@ hr { border-top: 1px solid #e0e0e0; margin: 16px 0; }
 #MainMenu {visibility: hidden;}
 footer {visibility: hidden;}
 
+/* ── Sidebar Width ── */
+section[data-testid="stSidebar"] {
+    min-width: 320px !important;
+    max-width: 320px !important;
+    width: 320px !important;
+}
+
 /* ── Compact Sidebar ── */
 section[data-testid="stSidebar"] > div:first-child {
     padding-top: 0.5rem !important;
@@ -497,7 +504,7 @@ with st.sidebar:
         unit_choice = st.radio(
             "Display units",
             options=["mg/dL", "mmol/L", "Both"],
-            index=0,
+            index=1,  # default: mmol/L
             horizontal=True,
         )
 
@@ -506,8 +513,8 @@ with st.sidebar:
         # ── Target Range ───────────────────────────────────────────────────────
         st.markdown("### 🎯 Target Range")
         if unit_choice == "mmol/L":
-            low_default  = round(70  * MG_TO_MMOL, 1)
-            high_default = round(180 * MG_TO_MMOL, 1)
+            low_default  = 4.0   # Calgary clinical default: 4.0 mmol/L
+            high_default = 7.0   # Calgary clinical default: 7.0 mmol/L
             low_mmol  = st.number_input("Low (mmol/L)",  min_value=1.0, max_value=10.0, value=low_default,  step=0.1, format="%.1f")
             high_mmol = st.number_input("High (mmol/L)", min_value=5.0, max_value=25.0, value=high_default, step=0.1, format="%.1f")
             target_low_mg  = round(low_mmol  / MG_TO_MMOL)
@@ -609,8 +616,13 @@ if st.session_state.authenticated and st.session_state.selected_patient:
             fetch_data(st.session_state.selected_patient)
 
 # ─── Main Content ─────────────────────────────────────────────────────────────
-st.markdown("# 📊 CGM Dashboard")
-st.markdown("---")
+st.markdown(
+    '<div style="margin-top:-1.5rem;margin-bottom:0.2rem;">'
+    '<span style="font-size:1.3rem;font-weight:800;">📊 CGM Dashboard</span>'
+    '</div>',
+    unsafe_allow_html=True
+)
+st.markdown('<hr style="margin:4px 0 8px 0;">', unsafe_allow_html=True)
 
 if not st.session_state.authenticated:
     st.info("👈 Please log in using the sidebar to view your glucose data.")
@@ -757,6 +769,7 @@ with tab_chart:
             window_start = datetime.combine(week_start, datetime.min.time())
             window_end   = datetime.combine(week_end,   datetime.max.time())
             period_label = f"Week of {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
+            week_days    = [week_start + timedelta(days=i) for i in range(7)]
 
         with nav_col6:
             st.markdown(
@@ -793,16 +806,6 @@ with tab_chart:
         if chart_df.empty:
             st.info(f"No readings found for {period_label}.")
         else:
-            if st.session_state.nav_view == "day":
-                date_str = anchor_date.strftime("%A, %B %d, %Y")
-                st.markdown(
-                    f'<div style="font-size:13px;font-weight:600;color:#1a73e8;'
-                    f'background:#f0f4ff;border:1px solid #c5d3f5;border-radius:8px;'
-                    f'padding:5px 14px;display:inline-block;margin-bottom:6px;">'
-                    f'📆 {date_str}</div>',
-                    unsafe_allow_html=True
-                )
-
             target_low_mmol  = round(target_low_mg  * MG_TO_MMOL, 1)
             target_high_mmol = round(target_high_mg * MG_TO_MMOL, 1)
 
@@ -815,111 +818,179 @@ with tab_chart:
                 y_max = tgt_centre + half_span
                 return y_min, y_max
 
-            data_min_mg = chart_df["Glucose_mg"].min()
-            data_max_mg = chart_df["Glucose_mg"].max()
-            y_min_mg, y_max_mg = centered_yrange_mg(target_low_mg, target_high_mg, data_min_mg, data_max_mg)
-            y_min_mmol = round(y_min_mg * MG_TO_MMOL, 1)
-            y_max_mmol = round(y_max_mg * MG_TO_MMOL, 1)
+            def build_day_chart(day_df, day_label, unit_choice,
+                                target_low_mg, target_high_mg,
+                                target_low_mmol, target_high_mmol,
+                                show_zoom_buttons=True):
+                """Build a single-day Plotly figure with target bands and midnight dotted lines."""
+                if day_df.empty:
+                    return None
 
-            fig = go.Figure()
+                data_min_mg = day_df["Glucose_mg"].min()
+                data_max_mg = day_df["Glucose_mg"].max()
+                y_min_mg, y_max_mg = centered_yrange_mg(target_low_mg, target_high_mg, data_min_mg, data_max_mg)
+                y_min_mmol = round(y_min_mg * MG_TO_MMOL, 1)
+                y_max_mmol = round(y_max_mg * MG_TO_MMOL, 1)
 
-            rangeselector_cfg = dict(
-                buttons=[
-                    dict(count=3,  label="3h",  step="hour", stepmode="backward"),
-                    dict(count=6,  label="6h",  step="hour", stepmode="backward"),
-                    dict(count=12, label="12h", step="hour", stepmode="backward"),
-                    dict(count=24, label="24h", step="hour", stepmode="backward"),
-                ],
-                bgcolor="#f0f4ff", activecolor="#1a73e8",
-                font=dict(size=11),
-                x=0.055, y=1.08,
-                xanchor="left",
-            )
-            zoom_annotation = dict(
-                text="<b>Zoom:</b>", x=0.0, y=1.10, xref="paper", yref="paper",
-                showarrow=False, font=dict(size=12, color="#555"),
-                xanchor="left", yanchor="middle"
-            )
+                fig = go.Figure()
 
-            if unit_choice == "Both":
-                colors_mg = chart_df["Glucose_mg"].apply(
-                    lambda v: "#cc0000" if v > target_high_mg else ("#e65c00" if v < target_low_mg else "#1a73e8")
-                )
-                fig.add_trace(go.Scatter(
-                    x=chart_df["Timestamp"], y=chart_df["Glucose_mg"],
-                    mode="lines+markers", name="mg/dL", yaxis="y1",
-                    line=dict(color="#1a73e8", width=2),
-                    marker=dict(color=colors_mg, size=6),
-                    hovertemplate="%{x|%H:%M}<br><b>%{y:.0f} mg/dL</b><extra></extra>"
-                ))
-                fig.add_trace(go.Scatter(
-                    x=chart_df["Timestamp"], y=chart_df["Glucose_mmol"],
-                    mode="lines", name="mmol/L", yaxis="y2",
-                    line=dict(color="#1a73e8", width=0), showlegend=True,
-                    hovertemplate="%{x|%H:%M}<br><b>%{y:.1f} mmol/L</b><extra></extra>"
-                ))
-                fig.add_hrect(y0=target_low_mg, y1=target_high_mg,
-                              fillcolor="rgba(0,200,0,0.07)", line_width=0,
-                              annotation_text="Target Range", annotation_position="top left")
-                fig.add_hline(y=target_low_mg,  line_dash="dot", line_color="#e65c00",
-                              annotation_text=f"Low ({target_low_mg} mg/dL)", annotation_position="bottom right")
-                fig.add_hline(y=target_high_mg, line_dash="dot", line_color="#cc0000",
-                              annotation_text=f"High ({target_high_mg} mg/dL)", annotation_position="top right")
-                fig.update_layout(
-                    xaxis_title="Time",
-                    yaxis=dict(title="Glucose (mg/dL)", range=[y_min_mg, y_max_mg], side="left"),
-                    yaxis2=dict(title="Glucose (mmol/L)", range=[y_min_mmol, y_max_mmol],
-                                overlaying="y", side="right", showgrid=False),
-                    hovermode="x unified", height=500, template="plotly_white",
-                    margin=dict(l=0, r=60, t=20, b=60),
-                    legend=dict(orientation="h", y=1.05),
-                    xaxis=dict(rangeslider=dict(visible=False), rangeselector=rangeselector_cfg),
-                    annotations=[zoom_annotation],
-                )
-            else:
-                if unit_choice == "mmol/L":
-                    y_col, y_label = "Glucose_mmol", "Glucose (mmol/L)"
-                    y_range = [y_min_mmol, y_max_mmol]
-                    tgt_low, tgt_high = target_low_mmol, target_high_mmol
-                    low_ann  = f"Low ({target_low_mmol} mmol/L)"
-                    high_ann = f"High ({target_high_mmol} mmol/L)"
-                    hover_fmt = "%{x|%H:%M}<br><b>%{y:.1f} mmol/L</b><extra></extra>"
+                rangeselector_cfg = dict(
+                    buttons=[
+                        dict(count=3,  label="3h",  step="hour", stepmode="backward"),
+                        dict(count=6,  label="6h",  step="hour", stepmode="backward"),
+                        dict(count=12, label="12h", step="hour", stepmode="backward"),
+                        dict(count=24, label="24h", step="hour", stepmode="backward"),
+                    ],
+                    bgcolor="#f0f4ff", activecolor="#1a73e8",
+                    font=dict(size=11),
+                    x=0.055, y=1.08,
+                    xanchor="left",
+                ) if show_zoom_buttons else None
+
+                zoom_annotation = dict(
+                    text="<b>Zoom:</b>", x=0.0, y=1.10, xref="paper", yref="paper",
+                    showarrow=False, font=dict(size=12, color="#555"),
+                    xanchor="left", yanchor="middle"
+                ) if show_zoom_buttons else None
+
+                if unit_choice == "Both":
+                    colors_mg = day_df["Glucose_mg"].apply(
+                        lambda v: "#cc0000" if v > target_high_mg else ("#e65c00" if v < target_low_mg else "#1a73e8")
+                    )
+                    fig.add_trace(go.Scatter(
+                        x=day_df["Timestamp"], y=day_df["Glucose_mg"],
+                        mode="lines+markers", name="mg/dL", yaxis="y1",
+                        line=dict(color="#1a73e8", width=2),
+                        marker=dict(color=colors_mg, size=6),
+                        hovertemplate="%{x|%H:%M}<br><b>%{y:.0f} mg/dL</b><extra></extra>"
+                    ))
+                    fig.add_trace(go.Scatter(
+                        x=day_df["Timestamp"], y=day_df["Glucose_mmol"],
+                        mode="lines", name="mmol/L", yaxis="y2",
+                        line=dict(color="#1a73e8", width=0), showlegend=True,
+                        hovertemplate="%{x|%H:%M}<br><b>%{y:.1f} mmol/L</b><extra></extra>"
+                    ))
+                    fig.add_hrect(y0=target_low_mg, y1=target_high_mg,
+                                  fillcolor="rgba(0,200,0,0.07)", line_width=0,
+                                  annotation_text="Target Range", annotation_position="top left")
+                    fig.add_hline(y=target_low_mg,  line_dash="dot", line_color="#e65c00",
+                                  annotation_text=f"Low ({target_low_mg} mg/dL)", annotation_position="bottom right")
+                    fig.add_hline(y=target_high_mg, line_dash="dot", line_color="#cc0000",
+                                  annotation_text=f"High ({target_high_mg} mg/dL)", annotation_position="top right")
+                    layout_extra = dict(
+                        yaxis=dict(title="Glucose (mg/dL)", range=[y_min_mg, y_max_mg], side="left"),
+                        yaxis2=dict(title="Glucose (mmol/L)", range=[y_min_mmol, y_max_mmol],
+                                    overlaying="y", side="right", showgrid=False),
+                        legend=dict(orientation="h", y=1.05),
+                        margin=dict(l=0, r=60, t=30, b=50),
+                    )
                 else:
-                    y_col, y_label = "Glucose_mg", "Glucose (mg/dL)"
-                    y_range = [y_min_mg, y_max_mg]
-                    tgt_low, tgt_high = target_low_mg, target_high_mg
-                    low_ann  = f"Low ({target_low_mg} mg/dL)"
-                    high_ann = f"High ({target_high_mg} mg/dL)"
-                    hover_fmt = "%{x|%H:%M}<br><b>%{y:.0f} mg/dL</b><extra></extra>"
+                    if unit_choice == "mmol/L":
+                        y_col, y_label = "Glucose_mmol", "Glucose (mmol/L)"
+                        y_range = [y_min_mmol, y_max_mmol]
+                        tgt_low, tgt_high = target_low_mmol, target_high_mmol
+                        low_ann  = f"Low ({target_low_mmol} mmol/L)"
+                        high_ann = f"High ({target_high_mmol} mmol/L)"
+                        hover_fmt = "%{x|%H:%M}<br><b>%{y:.1f} mmol/L</b><extra></extra>"
+                    else:
+                        y_col, y_label = "Glucose_mg", "Glucose (mg/dL)"
+                        y_range = [y_min_mg, y_max_mg]
+                        tgt_low, tgt_high = target_low_mg, target_high_mg
+                        low_ann  = f"Low ({target_low_mg} mg/dL)"
+                        high_ann = f"High ({target_high_mg} mg/dL)"
+                        hover_fmt = "%{x|%H:%M}<br><b>%{y:.0f} mg/dL</b><extra></extra>"
 
-                colors = chart_df[y_col].apply(
-                    lambda v: "#cc0000" if v > tgt_high else ("#e65c00" if v < tgt_low else "#1a73e8")
-                )
-                fig.add_hrect(y0=tgt_low, y1=tgt_high,
-                              fillcolor="rgba(0,200,0,0.07)", line_width=0,
-                              annotation_text="Target Range", annotation_position="top left")
-                fig.add_trace(go.Scatter(
-                    x=chart_df["Timestamp"], y=chart_df[y_col],
-                    mode="lines+markers", name="Glucose",
-                    line=dict(color="#1a73e8", width=2),
-                    marker=dict(color=colors, size=7),
-                    hovertemplate=hover_fmt
-                ))
-                fig.add_hline(y=tgt_low,  line_dash="dot", line_color="#e65c00",
-                              annotation_text=low_ann,  annotation_position="bottom right")
-                fig.add_hline(y=tgt_high, line_dash="dot", line_color="#cc0000",
-                              annotation_text=high_ann, annotation_position="top right")
+                    colors = day_df[y_col].apply(
+                        lambda v: "#cc0000" if v > tgt_high else ("#e65c00" if v < tgt_low else "#1a73e8")
+                    )
+                    fig.add_hrect(y0=tgt_low, y1=tgt_high,
+                                  fillcolor="rgba(0,200,0,0.07)", line_width=0,
+                                  annotation_text="Target Range", annotation_position="top left")
+                    fig.add_trace(go.Scatter(
+                        x=day_df["Timestamp"], y=day_df[y_col],
+                        mode="lines+markers", name="Glucose",
+                        line=dict(color="#1a73e8", width=2),
+                        marker=dict(color=colors, size=7),
+                        hovertemplate=hover_fmt
+                    ))
+                    fig.add_hline(y=tgt_low,  line_dash="dot", line_color="#e65c00",
+                                  annotation_text=low_ann,  annotation_position="bottom right")
+                    fig.add_hline(y=tgt_high, line_dash="dot", line_color="#cc0000",
+                                  annotation_text=high_ann, annotation_position="top right")
+                    layout_extra = dict(
+                        yaxis=dict(title=y_label, range=y_range),
+                        showlegend=False,
+                        margin=dict(l=0, r=0, t=30, b=50),
+                    )
+
+                xaxis_cfg = dict(rangeslider=dict(visible=False), title="Time")
+                if show_zoom_buttons and rangeselector_cfg:
+                    xaxis_cfg["rangeselector"] = rangeselector_cfg
+
+                annotations = []
+                if show_zoom_buttons and zoom_annotation:
+                    annotations.append(zoom_annotation)
+
                 fig.update_layout(
-                    xaxis_title="Time",
-                    yaxis=dict(title=y_label, range=y_range),
-                    hovermode="x unified", height=500, template="plotly_white",
-                    margin=dict(l=0, r=0, t=20, b=60),
-                    showlegend=False,
-                    xaxis=dict(rangeslider=dict(visible=False), rangeselector=rangeselector_cfg),
-                    annotations=[zoom_annotation],
+                    title=dict(text=day_label, font=dict(size=13, color="#1a73e8"), x=0, xanchor="left"),
+                    hovermode="x unified", height=420, template="plotly_white",
+                    xaxis=xaxis_cfg,
+                    annotations=annotations,
+                    **layout_extra,
                 )
+                return fig
 
-            st.plotly_chart(fig, use_container_width=True)
+            # ── Day View ──────────────────────────────────────────────────────
+            if st.session_state.nav_view == "day":
+                date_str = anchor_date.strftime("%A, %B %d, %Y")
+                st.markdown(
+                    f'<div style="font-size:13px;font-weight:600;color:#1a73e8;'
+                    f'background:#f0f4ff;border:1px solid #c5d3f5;border-radius:8px;'
+                    f'padding:5px 14px;display:inline-block;margin-bottom:6px;">'
+                    f'📆 {date_str}</div>',
+                    unsafe_allow_html=True
+                )
+                fig = build_day_chart(
+                    chart_df, date_str, unit_choice,
+                    target_low_mg, target_high_mg,
+                    target_low_mmol, target_high_mmol,
+                    show_zoom_buttons=True
+                )
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
+
+            # ── Week View: one chart per day ──────────────────────────────────
+            else:
+                st.markdown(
+                    f'<div style="font-size:13px;font-weight:600;color:#1a73e8;'
+                    f'background:#f0f4ff;border:1px solid #c5d3f5;border-radius:8px;'
+                    f'padding:5px 14px;display:inline-block;margin-bottom:10px;">'
+                    f'📆 {period_label}</div>',
+                    unsafe_allow_html=True
+                )
+                for day in week_days:
+                    day_start = datetime.combine(day, datetime.min.time())
+                    day_end   = datetime.combine(day, datetime.max.time())
+                    day_df    = chart_df[
+                        (chart_df["Timestamp"] >= day_start) &
+                        (chart_df["Timestamp"] <= day_end)
+                    ].copy()
+                    day_label = day.strftime("%A, %B %d, %Y")
+                    if day_df.empty:
+                        st.markdown(
+                            f'<div style="font-size:12px;color:#999;padding:4px 0;">{day_label} — no data</div>',
+                            unsafe_allow_html=True
+                        )
+                        continue
+                    fig = build_day_chart(
+                        day_df, day_label, unit_choice,
+                        target_low_mg, target_high_mg,
+                        target_low_mmol, target_high_mmol,
+                        show_zoom_buttons=False  # no zoom buttons in week view to keep it compact
+                    )
+                    if fig:
+                        st.plotly_chart(fig, use_container_width=True)
+                    st.markdown('<hr style="border-top:1px dashed #ccc;margin:4px 0 8px 0;">', unsafe_allow_html=True)
 
 # ── Tab 2: Readings Table ─────────────────────────────────────────────────────
 with tab_readings:
