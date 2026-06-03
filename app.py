@@ -499,67 +499,36 @@ with st.sidebar:
     st.markdown("## 📊 CGM Dashboard")
     st.markdown("---")
 
-    if not st.session_state.authenticated:
-        st.markdown("### 🔐 Login")
-        email    = st.text_input("LibreView Email", placeholder="you@example.com")
-        password = st.text_input("Password", type="password")
-        region   = st.selectbox(
-            "Region",
-            options=["US", "EU", "EU2", "CA", "AU", "AE", "DE", "FR", "JP", "RU"],
-            index=0,
-            help="The app will auto-detect and redirect to your correct regional server."
-        )
-        st.caption("💡 Not sure? Leave as US — the app will auto-redirect.")
-        if st.button("Login", use_container_width=True, type="primary"):
-            if email and password:
-                with st.spinner("Authenticating…"):
-                    ok, err = authenticate(email, password, region)
-                if ok:
-                    st.success("Logged in!")
-                    st.rerun()
-                else:
-                    st.error(err)
-            else:
-                st.warning("Please enter email and password.")
+    # ── Units (always visible — no login required) ─────────────────────────────
+    st.markdown("### 📐 Units")
+    unit_choice = st.radio(
+        "Display units",
+        options=["mg/dL", "mmol/L", "Both"],
+        index=1,  # default: mmol/L
+        horizontal=True,
+    )
+
+    st.markdown("---")
+
+    # ── Target Range (always visible) ─────────────────────────────────────────
+    st.markdown("### 🎯 Target Range")
+    if unit_choice == "mmol/L":
+        low_default  = 4.0
+        high_default = 7.0
+        low_mmol  = st.number_input("Low (mmol/L)",  min_value=1.0, max_value=10.0, value=low_default,  step=0.1, format="%.1f")
+        high_mmol = st.number_input("High (mmol/L)", min_value=5.0, max_value=25.0, value=high_default, step=0.1, format="%.1f")
+        target_low_mg  = round(low_mmol  / MG_TO_MMOL)
+        target_high_mg = round(high_mmol / MG_TO_MMOL)
+        st.caption(f"≈ {target_low_mg:.0f} – {target_high_mg:.0f} mg/dL")
     else:
-        st.success("✅ Authenticated")
+        target_low_mg  = st.number_input("Low (mg/dL)",  min_value=40,  max_value=180, value=70,  step=1)
+        target_high_mg = st.number_input("High (mg/dL)", min_value=100, max_value=400, value=180, step=1)
+        st.caption(f"≈ {mg_to_mmol(target_low_mg):.1f} – {mg_to_mmol(target_high_mg):.1f} mmol/L")
 
-        if len(st.session_state.patients) > 1:
-            patient_names = [f"{p.first_name} {p.last_name}" for p in st.session_state.patients]
-            idx = st.selectbox("Patient", range(len(patient_names)), format_func=lambda i: patient_names[i])
-            st.session_state.selected_patient = st.session_state.patients[idx]
+    st.markdown("---")
 
-        st.markdown("---")
-
-        # ── Units ──────────────────────────────────────────────────────────────
-        st.markdown("### 📐 Units")
-        unit_choice = st.radio(
-            "Display units",
-            options=["mg/dL", "mmol/L", "Both"],
-            index=1,  # default: mmol/L
-            horizontal=True,
-        )
-
-        st.markdown("---")
-
-        # ── Target Range ───────────────────────────────────────────────────────
-        st.markdown("### 🎯 Target Range")
-        if unit_choice == "mmol/L":
-            low_default  = 4.0   # Calgary clinical default: 4.0 mmol/L
-            high_default = 7.0   # Calgary clinical default: 7.0 mmol/L
-            low_mmol  = st.number_input("Low (mmol/L)",  min_value=1.0, max_value=10.0, value=low_default,  step=0.1, format="%.1f")
-            high_mmol = st.number_input("High (mmol/L)", min_value=5.0, max_value=25.0, value=high_default, step=0.1, format="%.1f")
-            target_low_mg  = round(low_mmol  / MG_TO_MMOL)
-            target_high_mg = round(high_mmol / MG_TO_MMOL)
-            st.caption(f"≈ {target_low_mg:.0f} – {target_high_mg:.0f} mg/dL")
-        else:
-            target_low_mg  = st.number_input("Low (mg/dL)",  min_value=40,  max_value=180, value=70,  step=1)
-            target_high_mg = st.number_input("High (mg/dL)", min_value=100, max_value=400, value=180, step=1)
-            st.caption(f"≈ {mg_to_mmol(target_low_mg):.1f} – {mg_to_mmol(target_high_mg):.1f} mmol/L")
-
-        st.markdown("---")
-
-        # ── Refresh ────────────────────────────────────────────────────────────
+    # ── Refresh (only when live API is connected) ──────────────────────────────
+    if st.session_state.authenticated:
         st.markdown("### 🔄 Refresh")
         refresh_interval = st.selectbox(
             "Auto-refresh every",
@@ -577,59 +546,80 @@ with st.sidebar:
             lu = st.session_state.last_update
             tz_abbr = lu.strftime("%Z") if lu.tzinfo else "MT"
             st.caption(f"Last fetched: {lu.strftime('%H:%M:%S')} {tz_abbr}")
+    else:
+        refresh_interval = 5  # default when not authenticated
 
-        # Show cache status
-        cache_df_info = load_cache_df()
-        if not cache_df_info.empty:
-            oldest = cache_df_info["Timestamp"].min().strftime("%b %d, %Y")
-            newest = cache_df_info["Timestamp"].max().strftime("%b %d %H:%M")
-            st.caption(f"📦 Cache: {len(cache_df_info):,} readings\n{oldest} → {newest}")
+    # Show cache status
+    cache_df_info = load_cache_df()
+    if not cache_df_info.empty:
+        oldest = cache_df_info["Timestamp"].min().strftime("%b %d, %Y")
+        newest = cache_df_info["Timestamp"].max().strftime("%b %d %H:%M")
+        st.caption(f"📦 Cache: {len(cache_df_info):,} readings\n{oldest} → {newest}")
 
-        st.markdown("---")
+    st.markdown("---")
 
-        # ── Historical Data (CSV Upload) ───────────────────────────────────────
-        st.markdown("### 📁 Historical Data")
-        st.caption(
-            "Upload a LibreView CSV to permanently store history in GitHub. "
-            "Once committed, every viewer worldwide sees the full history."
-        )
+    # ── Historical Data (CSV Upload) ───────────────────────────────────────────
+    st.markdown("### 📁 Historical Data")
+    st.caption(
+        "Upload a LibreView CSV to permanently store history in GitHub. "
+        "Once committed, every viewer worldwide sees the full history."
+    )
 
-        uploaded = st.file_uploader(
-            "Upload LibreView CSV",
-            type=["csv"],
-            label_visibility="collapsed",
-            help="Download from LibreView website → Glucose History → Download glucose data"
-        )
-        if uploaded is not None:
-            with st.spinner("Parsing CSV…"):
-                csv_df, err = parse_libreview_csv(uploaded)
-            if err:
-                st.error(f"CSV error: {err}")
-            elif csv_df.empty:
-                st.warning("No glucose readings found in CSV.")
+    uploaded = st.file_uploader(
+        "Upload LibreView CSV",
+        type=["csv"],
+        label_visibility="collapsed",
+        help="Download from LibreView website → Glucose History → Download glucose data"
+    )
+    if uploaded is not None:
+        with st.spinner("Parsing CSV…"):
+            csv_df, err = parse_libreview_csv(uploaded)
+        if err:
+            st.error(f"CSV error: {err}")
+        elif csv_df.empty:
+            st.warning("No glucose readings found in CSV.")
+        else:
+            existing = load_cache_df()
+            merged   = merge_with_cache(csv_df, existing)
+            added    = len(merged) - len(existing)
+            with st.spinner(f"Committing {len(merged):,} readings to GitHub repo…"):
+                ok, msg = commit_cache_to_github(merged)
+            if ok:
+                save_cache(merged)
+                st.success(f"{msg}\n+{added:,} new readings added ({len(merged):,} total).")
+                st.rerun()
             else:
-                existing = load_cache_df()
-                merged   = merge_with_cache(csv_df, existing)
-                added    = len(merged) - len(existing)
-                with st.spinner(f"Committing {len(merged):,} readings to GitHub repo…"):
-                    ok, msg = commit_cache_to_github(merged)
-                if ok:
-                    save_cache(merged)  # also write locally for immediate display
-                    st.success(f"{msg}\n+{added:,} new readings added ({len(merged):,} total).")
-                    st.rerun()
-                else:
-                    save_cache(merged)  # local fallback
-                    st.warning(
-                        f"⚠️ Could not commit to GitHub: {msg}\n\n"
-                        "Data saved for this session only. "
-                        "To make it permanent, add `[github]\npat = 'ghp_...'` "
-                        "to Streamlit Cloud Secrets."
-                    )
-                    st.rerun()
+                save_cache(merged)
+                st.warning(
+                    f"⚠️ Could not commit to GitHub: {msg}\n\n"
+                    "Data saved for this session only."
+                )
+                st.rerun()
 
+    # ── Admin: manual login (hidden at bottom, only shown when not auto-logged in) ──
+    if not st.session_state.authenticated:
         st.markdown("---")
-
-        # ── Logout ─────────────────────────────────────────────────────────────
+        with st.expander("🔐 Admin Login", expanded=False):
+            _email    = st.text_input("LibreView Email", placeholder="you@example.com", key="manual_email")
+            _password = st.text_input("Password", type="password", key="manual_password")
+            _region   = st.selectbox("Region", options=["US", "EU", "EU2", "CA", "AU", "AE", "DE", "FR", "JP", "RU"], index=0, key="manual_region")
+            if st.button("Login", use_container_width=True, type="primary", key="manual_login_btn"):
+                if _email and _password:
+                    with st.spinner("Authenticating…"):
+                        ok, err = authenticate(_email, _password, _region)
+                    if ok:
+                        st.success("Logged in!")
+                        st.rerun()
+                    else:
+                        st.error(err)
+                else:
+                    st.warning("Please enter email and password.")
+    else:
+        if len(st.session_state.patients) > 1:
+            patient_names = [f"{p.first_name} {p.last_name}" for p in st.session_state.patients]
+            idx = st.selectbox("Patient", range(len(patient_names)), format_func=lambda i: patient_names[i])
+            st.session_state.selected_patient = st.session_state.patients[idx]
+        st.markdown("---")
         if st.button("🚪 Logout", use_container_width=True):
             for k in ["api", "authenticated", "patients", "selected_patient",
                       "latest_reading", "graph_data", "logbook_data", "last_update"]:
@@ -656,84 +646,65 @@ st.markdown(
 )
 st.markdown('<hr style="margin:4px 0 8px 0;">', unsafe_allow_html=True)
 
-if not st.session_state.authenticated:
-    st.info("👈 Please log in using the sidebar to view your glucose data.")
-    # Show cache status even when not logged in
-    cache_df_preview = load_cache_df()
-    if not cache_df_preview.empty:
-        st.success(f"📦 Background cache active: {len(cache_df_preview):,} readings stored "
-                   f"({cache_df_preview['Timestamp'].min().strftime('%b %d')} – "
-                   f"{cache_df_preview['Timestamp'].max().strftime('%b %d, %Y')}). "
-                   f"Log in to view your data.")
-    st.stop()
-
-# ─── Latest Reading Header ────────────────────────────────────────────────────
+# ─── Latest Reading Header (only when live API data is available) ─────────────
 latest = st.session_state.latest_reading
-if latest is None:
-    st.info("No data yet. Click 'Refresh Now' in the sidebar.")
-    st.stop()
 
-# Get the latest glucose value
-latest_mg = float(latest.value_in_mg_per_dl if latest.value_in_mg_per_dl else latest.value)
-trend_obj  = latest.trend_arrow if hasattr(latest, 'trend_arrow') else None
-trend_text = TREND_LABELS.get(trend_obj, "→") if trend_obj else "→"
-status_label, glucose_class, badge_class = glucose_status(latest_mg, target_low_mg, target_high_mg)
+# Show live reading header only when live API data is available
+if latest is not None:
+    latest_mg = float(latest.value_in_mg_per_dl if latest.value_in_mg_per_dl else latest.value)
+    trend_obj  = latest.trend_arrow if hasattr(latest, 'trend_arrow') else None
+    trend_text = TREND_LABELS.get(trend_obj, "→") if trend_obj else "→"
+    status_label, glucose_class, badge_class = glucose_status(latest_mg, target_low_mg, target_high_mg)
 
-if unit_choice == "mmol/L":
-    display_val  = f"{mg_to_mmol(latest_mg):.1f}"
-    display_unit = "mmol/L"
-elif unit_choice == "Both":
-    display_val  = f"{latest_mg:.0f} / {mg_to_mmol(latest_mg):.1f}"
-    display_unit = "mg/dL  |  mmol/L"
-else:
-    display_val  = f"{latest_mg:.0f}"
-    display_unit = "mg/dL"
+    if unit_choice == "mmol/L":
+        display_val  = f"{mg_to_mmol(latest_mg):.1f}"
+        display_unit = "mmol/L"
+    elif unit_choice == "Both":
+        display_val  = f"{latest_mg:.0f} / {mg_to_mmol(latest_mg):.1f}"
+        display_unit = "mg/dL  |  mmol/L"
+    else:
+        display_val  = f"{latest_mg:.0f}"
+        display_unit = "mg/dL"
 
-ts = latest.factory_timestamp if hasattr(latest, 'factory_timestamp') and latest.factory_timestamp else latest.timestamp
-if hasattr(ts, 'astimezone'):
-    # Convert UTC reading time to Calgary (Mountain Time)
-    ts_calgary = ts.astimezone(CALGARY_TZ)
-    tz_abbr = ts_calgary.strftime("%Z")  # MDT or MST
-    reading_time_str = ts_calgary.strftime(f"%b %d, %Y  %H:%M:%S {tz_abbr}")
-else:
-    reading_time_str = str(ts)
+    ts = latest.factory_timestamp if hasattr(latest, 'factory_timestamp') and latest.factory_timestamp else latest.timestamp
+    if hasattr(ts, 'astimezone'):
+        ts_calgary = ts.astimezone(CALGARY_TZ)
+        tz_abbr = ts_calgary.strftime("%Z")
+        reading_time_str = ts_calgary.strftime(f"%b %d, %Y  %H:%M:%S {tz_abbr}")
+    else:
+        reading_time_str = str(ts)
 
-col_glucose, col_trend, col_status, col_last = st.columns([2, 1, 1, 2])
-
-with col_glucose:
-    st.markdown(
-        f'<div class="glucose-display {glucose_class}">{display_val}</div>'
-        f'<div style="font-size:14px;color:#888;margin-top:4px;">{display_unit}</div>',
-        unsafe_allow_html=True
-    )
-
-with col_trend:
-    st.metric("Trend", trend_text)
-
-with col_status:
-    st.markdown(
-        f'<div style="padding-top:8px;">'
-        f'<div style="font-size:12px;color:#888;margin-bottom:4px;">Status</div>'
-        f'<span class="{badge_class}">{status_label}</span>'
-        f'</div>',
-        unsafe_allow_html=True
-    )
-
-with col_last:
-    st.markdown(
-        f'<div class="last-reading-box">'
-        f'<div style="font-size:12px;color:#888;margin-bottom:4px;">Last Reading</div>'
-        f'<div style="font-size:20px;font-weight:700;">{display_val} <span style="font-size:13px;font-weight:400;color:#555;">{display_unit}</span></div>'
-        f'<div style="font-size:13px;color:#444;margin-top:2px;">🕐 {reading_time_str}</div>'
-        f'</div>',
-        unsafe_allow_html=True
-    )
-    if unit_choice == "mg/dL":
-        st.caption(f"≈ {mg_to_mmol(latest_mg):.1f} mmol/L")
-    elif unit_choice == "mmol/L":
-        st.caption(f"≈ {latest_mg:.0f} mg/dL")
-
-st.markdown("---")
+    col_glucose, col_trend, col_status, col_last = st.columns([2, 1, 1, 2])
+    with col_glucose:
+        st.markdown(
+            f'<div class="glucose-display {glucose_class}">{display_val}</div>'
+            f'<div style="font-size:14px;color:#888;margin-top:4px;">{display_unit}</div>',
+            unsafe_allow_html=True
+        )
+    with col_trend:
+        st.metric("Trend", trend_text)
+    with col_status:
+        st.markdown(
+            f'<div style="padding-top:8px;">'
+            f'<div style="font-size:12px;color:#888;margin-bottom:4px;">Status</div>'
+            f'<span class="{badge_class}">{status_label}</span>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+    with col_last:
+        st.markdown(
+            f'<div class="last-reading-box">'
+            f'<div style="font-size:12px;color:#888;margin-bottom:4px;">Last Reading</div>'
+            f'<div style="font-size:20px;font-weight:700;">{display_val} <span style="font-size:13px;font-weight:400;color:#555;">{display_unit}</span></div>'
+            f'<div style="font-size:13px;color:#444;margin-top:2px;">🕐 {reading_time_str}</div>'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+        if unit_choice == "mg/dL":
+            st.caption(f"≈ {mg_to_mmol(latest_mg):.1f} mmol/L")
+        elif unit_choice == "mmol/L":
+            st.caption(f"≈ {latest_mg:.0f} mg/dL")
+    st.markdown("---")
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
 tab_chart, tab_readings, tab_stats = st.tabs(["📈 Trend Chart", "📋 All Readings", "📊 Statistics"])
