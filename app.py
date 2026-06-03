@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 import json
 import io
+import base64
+import requests
 from pathlib import Path
 from pylibrelinkup import PyLibreLinkUp, APIUrl
 from pylibrelinkup.exceptions import (
@@ -285,6 +287,73 @@ def save_cache(df: pd.DataFrame):
         st.error(f"Could not save cache: {e}")
         return False
 
+# ─── GitHub Repo Constants ────────────────────────────────────────────────────
+GITHUB_REPO  = "waves-s/cgm-dashboard"
+GITHUB_PATH  = "cache.json"   # path inside the repo
+GITHUB_BRANCH = "main"
+
+def commit_cache_to_github(df: pd.DataFrame) -> tuple[bool, str]:
+    """
+    Serialise df to cache.json format and commit it directly to the GitHub repo
+    via the GitHub Contents API.  Requires a GH_PAT secret in Streamlit secrets
+    with repo write access.
+
+    Returns (success: bool, message: str).
+    """
+    try:
+        # Read token from Streamlit secrets
+        gh_token = st.secrets.get("github", {}).get("pat") or st.secrets.get("GH_PAT", "")
+        if not gh_token:
+            return False, "GitHub token not found in secrets. Add [github] pat = '...' to Streamlit secrets."
+
+        # Build the JSON payload
+        readings = []
+        for _, row in df.iterrows():
+            readings.append({
+                "timestamp": row["Timestamp"].isoformat(),
+                "value_mg_dl": float(row["Glucose_mg"]),
+                "trend": str(row.get("trend", "STABLE")),
+                "source": str(row.get("source", "csv")),
+            })
+        data = {
+            "readings": readings,
+            "last_updated": datetime.now(CALGARY_TZ).isoformat(),
+            "source": "merged",
+        }
+        content_str = json.dumps(data, indent=2)
+        content_b64 = base64.b64encode(content_str.encode()).decode()
+
+        headers = {
+            "Authorization": f"token {gh_token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_PATH}"
+
+        # Get the current file SHA (needed to update an existing file)
+        get_resp = requests.get(api_url, headers=headers, params={"ref": GITHUB_BRANCH}, timeout=15)
+        sha = get_resp.json().get("sha") if get_resp.status_code == 200 else None
+
+        # Commit the new content
+        payload = {
+            "message": f"seed: upload {len(readings):,} historical readings via dashboard",
+            "content": content_b64,
+            "branch": GITHUB_BRANCH,
+        }
+        if sha:
+            payload["sha"] = sha  # required when updating an existing file
+
+        put_resp = requests.put(api_url, headers=headers, json=payload, timeout=30)
+        if put_resp.status_code in (200, 201):
+            return True, f"✅ {len(readings):,} readings committed to GitHub repo — visible to everyone worldwide."
+        else:
+            detail = put_resp.json().get("message", put_resp.text[:200])
+            return False, f"GitHub API error {put_resp.status_code}: {detail}"
+
+    except Exception as e:
+        return False, f"Commit failed: {e}"
+
+
 def parse_libreview_csv(uploaded_file) -> pd.DataFrame:
     """
     Parse a LibreView CSV export file.
@@ -492,7 +561,10 @@ with st.sidebar:
 
         # ── Historical Data (CSV Upload) ───────────────────────────────────────
         st.markdown("### 📁 Historical Data")
-        st.caption("Upload a LibreView CSV export to seed full history. Only needed once — the app caches it automatically.")
+        st.caption(
+            "Upload a LibreView CSV to permanently store history in GitHub. "
+            "Once committed, every viewer worldwide sees the full history."
+        )
 
         uploaded = st.file_uploader(
             "Upload LibreView CSV",
@@ -510,9 +582,21 @@ with st.sidebar:
             else:
                 existing = load_cache_df()
                 merged   = merge_with_cache(csv_df, existing)
-                if save_cache(merged):
-                    added = len(merged) - len(existing)
-                    st.success(f"✅ Added {added:,} readings from CSV ({len(merged):,} total in cache).")
+                added    = len(merged) - len(existing)
+                with st.spinner(f"Committing {len(merged):,} readings to GitHub repo…"):
+                    ok, msg = commit_cache_to_github(merged)
+                if ok:
+                    save_cache(merged)  # also write locally for immediate display
+                    st.success(f"{msg}\n+{added:,} new readings added ({len(merged):,} total).")
+                    st.rerun()
+                else:
+                    save_cache(merged)  # local fallback
+                    st.warning(
+                        f"⚠️ Could not commit to GitHub: {msg}\n\n"
+                        "Data saved for this session only. "
+                        "To make it permanent, add `[github]\npat = 'ghp_...'` "
+                        "to Streamlit Cloud Secrets."
+                    )
                     st.rerun()
 
         st.markdown("---")
@@ -870,16 +954,25 @@ with tab_readings:
         all_df["Time"] = all_df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M") + " MT"
 
         display_df = all_df[["Time", "Glucose", "Status"]].copy()
+        # Ensure all columns are plain strings — avoids Styler serialisation errors
+        display_df["Time"]    = display_df["Time"].astype(str)
+        display_df["Glucose"] = display_df["Glucose"].astype(str)
+        display_df["Status"]  = display_df["Status"].astype(str)
+        display_df = display_df.reset_index(drop=True)
 
-        def highlight_row(row):
-            s = row["Status"]
-            if s == "HIGH":   return ["background-color: #fff0f0"] * len(row)
-            elif s == "LOW":  return ["background-color: #fff8f0"] * len(row)
-            return [""] * len(row)
-
-        styled = display_df.style.apply(highlight_row, axis=1)
         st.caption(f"Showing {len(display_df):,} readings")
-        st.dataframe(styled, use_container_width=True, height=500)
+        st.dataframe(
+            display_df,
+            use_container_width=True,
+            height=500,
+            column_config={
+                "Status": st.column_config.TextColumn(
+                    "Status",
+                    help="HIGH = above target  |  LOW = below target  |  In Range = within target",
+                ),
+            },
+            hide_index=True,
+        )
 
 # ── Tab 3: Statistics ─────────────────────────────────────────────────────────
 with tab_stats:
