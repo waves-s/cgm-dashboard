@@ -636,13 +636,17 @@ with st.sidebar:
             st.rerun()
 
 # ─── Auto-refresh ─────────────────────────────────────────────────────────────
+# Always fetch live data on every page load/refresh when authenticated.
+# This ensures the chart is always up to date regardless of GitHub Actions schedule.
 if st.session_state.authenticated and st.session_state.selected_patient:
     if st.session_state.last_update is None:
         with st.spinner("Loading latest readings…"):
             fetch_data(st.session_state.selected_patient)
     else:
+        # Re-fetch on every page load (Streamlit reruns), but throttle to at most
+        # once every 60 seconds to avoid hammering the LibreView API on rapid reruns
         elapsed = (datetime.now(CALGARY_TZ) - st.session_state.last_update).total_seconds()
-        if elapsed >= refresh_interval * 60:
+        if elapsed >= 60:
             fetch_data(st.session_state.selected_patient)
 
 # ─── Main Content ─────────────────────────────────────────────────────────────
