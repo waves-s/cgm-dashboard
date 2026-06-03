@@ -147,7 +147,7 @@ for key, default in {
     "nav_offset_days": 0,
     "nav_view": "day",
     "cache_df": None,         # Full merged DataFrame from cache.json
-    "show_last_24h": False,   # True when Latest button was clicked
+    "show_last_24h": True,    # Default: show last 24h on first load
     "auto_login_attempted": False,  # Only try auto-login once per session
 }.items():
     if key not in st.session_state:
