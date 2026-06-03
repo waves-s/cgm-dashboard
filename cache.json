@@ -1,60 +1,6 @@
 {
   "readings": [
     {
-      "timestamp": "2025-05-16T04:46:00",
-      "value_mg_dl": 102.7,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-16T05:01:00",
-      "value_mg_dl": 99.1,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-16T05:16:00",
-      "value_mg_dl": 100.9,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-16T05:31:00",
-      "value_mg_dl": 104.5,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-16T05:46:00",
-      "value_mg_dl": 100.9,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-16T06:01:00",
-      "value_mg_dl": 97.3,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-16T06:16:00",
-      "value_mg_dl": 100.9,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-16T06:31:00",
-      "value_mg_dl": 104.5,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-16T06:46:00",
-      "value_mg_dl": 104.5,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
       "timestamp": "2025-05-16T07:01:00",
       "value_mg_dl": 104.5,
       "trend": "STABLE",
@@ -315001,6 +314947,12 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-06-03T00:41:28",
+      "value_in_mg_per_dl": 92.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-03T00:41:29+00:00",
       "value_mg_dl": 91.0,
       "trend": "",
@@ -315013,6 +314965,12 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-06-03T00:46:29",
+      "value_in_mg_per_dl": 91.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-03T00:46:29+00:00",
       "value_mg_dl": 90.0,
       "trend": "",
@@ -315021,7 +314979,7 @@
     {
       "timestamp": "2026-06-03T00:51:29",
       "value_in_mg_per_dl": 89.0,
-      "trend": "STABLE",
+      "trend": "",
       "source": "live"
     },
     {
@@ -315055,8 +315013,26 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-06-03T00:56:30",
+      "value_in_mg_per_dl": 88.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-03T01:01:28+00:00",
       "value_mg_dl": 87.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-03T01:01:29",
+      "value_in_mg_per_dl": 85.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-03T01:06:28",
+      "value_in_mg_per_dl": 83.0,
       "trend": "",
       "source": "live"
     },
@@ -315067,14 +315043,32 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-06-03T01:11:28",
+      "value_in_mg_per_dl": 82.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-03T01:11:29+00:00",
       "value_mg_dl": 89.0,
       "trend": "",
       "source": "live"
     },
     {
+      "timestamp": "2026-06-03T01:16:28",
+      "value_in_mg_per_dl": 82.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-03T01:16:30+00:00",
       "value_mg_dl": 90.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-03T01:21:29",
+      "value_in_mg_per_dl": 82.0,
       "trend": "",
       "source": "live"
     },
@@ -315106,6 +315100,12 @@
       "timestamp": "2026-06-03T01:41:30+00:00",
       "value_mg_dl": 103.0,
       "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-03T01:42:28",
+      "value_in_mg_per_dl": 81.0,
+      "trend": "STABLE",
       "source": "live"
     },
     {
@@ -315361,7 +315361,7 @@
       "source": "live"
     }
   ],
-  "last_updated": "2026-06-03T00:55:45.573848-06:00",
+  "last_updated": "2026-06-03T04:17:57.506784-06:00",
   "source": "live_api",
   "timezone_note": "All timestamps are Calgary local time (America/Edmonton). No conversion needed at display."
 }
