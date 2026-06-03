@@ -333,13 +333,25 @@ def parse_libreview_csv(uploaded_file) -> pd.DataFrame:
         # Build result DataFrame
         result = pd.DataFrame()
         # LibreView CSV exports timestamps in the account's local time (Calgary/Mountain Time).
-        # Parse as naive, then localize to Calgary so they are consistent with API data.
+        # We parse them as naive datetimes and then localize element-by-element using
+        # nonexistent="shift_forward" and ambiguous="NaT" to safely handle DST transitions
+        # across multiple years without the "3 dst switches" error from pandas batch inference.
         raw_ts = pd.to_datetime(df[ts_col], errors="coerce", dayfirst=False)
-        result["Timestamp"] = (
-            raw_ts
-            .dt.tz_localize(CALGARY_TZ, ambiguous="infer", nonexistent="shift_forward")
-            .dt.tz_convert(CALGARY_TZ)
-            .dt.tz_localize(None)  # store as naive Calgary-local, matching API data
+
+        def _localize_calgary(ts):
+            """Localize a single naive Timestamp to Calgary time, handling DST edge cases."""
+            if pd.isna(ts):
+                return pd.NaT
+            try:
+                # Replace tzinfo directly using zoneinfo — handles DST correctly per-timestamp
+                return ts.replace(tzinfo=CALGARY_TZ)
+            except Exception:
+                return pd.NaT
+
+        localized = raw_ts.apply(_localize_calgary)
+        # Drop the tzinfo so the result is naive Calgary-local (matching API data in the app)
+        result["Timestamp"] = localized.apply(
+            lambda t: t.replace(tzinfo=None) if not pd.isna(t) else pd.NaT
         )
         result = result.dropna(subset=["Timestamp"])
 
