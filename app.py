@@ -147,9 +147,32 @@ for key, default in {
     "nav_offset_days": 0,
     "nav_view": "day",
     "cache_df": None,         # Full merged DataFrame from cache.json
+    "show_last_24h": False,   # True when Latest button was clicked
+    "auto_login_attempted": False,  # Only try auto-login once per session
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
+
+# ─── Auto-Login from Streamlit Secrets ────────────────────────────────────────
+# Attempt silent authentication on first page load so visitors never see a login form.
+if not st.session_state.authenticated and not st.session_state.auto_login_attempted:
+    st.session_state.auto_login_attempted = True
+    try:
+        # Support both [libreview] table and flat LIBREVIEW_* keys
+        if "libreview" in st.secrets:
+            _auto_email    = st.secrets["libreview"]["email"]
+            _auto_password = st.secrets["libreview"]["password"]
+        elif "LIBREVIEW_EMAIL" in st.secrets:
+            _auto_email    = st.secrets["LIBREVIEW_EMAIL"]
+            _auto_password = st.secrets["LIBREVIEW_PASSWORD"]
+        else:
+            _auto_email = _auto_password = None
+
+        if _auto_email and _auto_password:
+            authenticate(_auto_email, _auto_password, "US")
+            # authenticate() sets st.session_state.authenticated = True on success
+    except Exception:
+        pass  # Secrets not configured — fall back to manual login form
 
 # ─── Helper Functions ──────────────────────────────────────────────────────────
 TREND_LABELS = {
@@ -748,30 +771,44 @@ with tab_chart:
             st.write("")
             if st.button("⏮ Oldest", use_container_width=True):
                 st.session_state.nav_offset_days = min_offset
+                st.session_state.show_last_24h = False
                 st.rerun()
         with nav_col3:
             st.write("")
             step = 1 if st.session_state.nav_view == "day" else 7
-            if st.button("◀ Back", use_container_width=True):
+            if st.button("◄ Back", use_container_width=True):
                 st.session_state.nav_offset_days = max(min_offset, offset - step)
+                st.session_state.show_last_24h = False
                 st.rerun()
         with nav_col4:
             st.write("")
-            if st.button("Forward ▶", use_container_width=True):
+            if st.button("Forward ►", use_container_width=True):
                 st.session_state.nav_offset_days = min(0, offset + step)
+                st.session_state.show_last_24h = False
                 st.rerun()
         with nav_col5:
             st.write("")
             if st.button("Latest ⏭", use_container_width=True):
                 st.session_state.nav_offset_days = 0
+                st.session_state.nav_view = "day"
+                st.session_state.show_last_24h = True
                 st.rerun()
 
         anchor_date = data_max_date + timedelta(days=st.session_state.nav_offset_days)
-        if st.session_state.nav_view == "day":
+
+        # ── Latest ⏭ mode: show rolling last-24h window ────────────────────────────
+        if st.session_state.show_last_24h and st.session_state.nav_view == "day":
+            latest_ts   = wide_df["Timestamp"].max()
+            window_end   = latest_ts
+            window_start = latest_ts - timedelta(hours=24)
+            period_label = f"Last 24 hours  (–{latest_ts.strftime('%b %d %H:%M')} MT)"
+        elif st.session_state.nav_view == "day":
             window_start = datetime.combine(anchor_date, datetime.min.time())
             window_end   = datetime.combine(anchor_date, datetime.max.time())
             period_label = anchor_date.strftime("%A, %b %d %Y")
         else:
+            # Any week navigation clears the 24h mode
+            st.session_state.show_last_24h = False
             week_start   = anchor_date - timedelta(days=anchor_date.weekday())
             week_end     = week_start + timedelta(days=6)
             window_start = datetime.combine(week_start, datetime.min.time())
@@ -804,6 +841,7 @@ with tab_chart:
                 if picked != anchor_date:
                     new_offset = (picked - data_max_date).days
                     st.session_state.nav_offset_days = max(min_offset, min(0, new_offset))
+                    st.session_state.show_last_24h = False
                     st.rerun()
 
         chart_df = wide_df[
