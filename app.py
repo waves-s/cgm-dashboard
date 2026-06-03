@@ -538,14 +538,9 @@ with st.sidebar:
     st.markdown("---")
 
     # ── Refresh (only when live API is connected) ──────────────────────────────
+    refresh_interval = 5  # fixed 5-minute auto-refresh
     if st.session_state.authenticated:
         st.markdown("### 🔄 Refresh")
-        refresh_interval = st.selectbox(
-            "Auto-refresh every",
-            options=[1, 5, 10, 15, 30],
-            index=1,
-            format_func=lambda x: f"{x} min"
-        )
         if st.button("🔄 Refresh Now", use_container_width=True):
             if st.session_state.selected_patient:
                 with st.spinner("Fetching latest readings…"):
@@ -556,8 +551,6 @@ with st.sidebar:
             lu = st.session_state.last_update
             tz_abbr = lu.strftime("%Z") if lu.tzinfo else "MT"
             st.caption(f"Last fetched: {lu.strftime('%H:%M:%S')} {tz_abbr}")
-    else:
-        refresh_interval = 5  # default when not authenticated
 
     # Show cache status
     cache_df_info = load_cache_df()
