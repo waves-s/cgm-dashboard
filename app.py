@@ -263,7 +263,15 @@ def load_cache_df() -> pd.DataFrame:
         if not readings:
             return pd.DataFrame()
         df = pd.DataFrame(readings)
-        df.rename(columns={"timestamp": "Timestamp", "value_mg_dl": "Glucose_mg"}, inplace=True)
+        # Handle both key names: value_in_mg_per_dl (current) and value_mg_dl (legacy poller)
+        if "value_in_mg_per_dl" in df.columns and "value_mg_dl" not in df.columns:
+            df.rename(columns={"timestamp": "Timestamp", "value_in_mg_per_dl": "Glucose_mg"}, inplace=True)
+        elif "value_mg_dl" in df.columns and "value_in_mg_per_dl" not in df.columns:
+            df.rename(columns={"timestamp": "Timestamp", "value_mg_dl": "Glucose_mg"}, inplace=True)
+        else:
+            # Both present — prefer value_in_mg_per_dl, fill NaN from value_mg_dl
+            df["Glucose_mg"] = df["value_in_mg_per_dl"].combine_first(df["value_mg_dl"])
+            df.rename(columns={"timestamp": "Timestamp"}, inplace=True)
         # Timestamps in cache.json are Calgary local naive strings (no UTC conversion needed).
         # If a timestamp has a UTC offset (legacy entries), convert it to Calgary naive.
         def parse_ts(ts_str):
@@ -294,9 +302,9 @@ def save_cache(df: pd.DataFrame):
         for _, row in df.iterrows():
             readings.append({
                 "timestamp": row["Timestamp"].isoformat(),
-                "value_mg_dl": float(row["Glucose_mg"]),
-                "trend": row.get("trend", "STABLE"),
-                "source": row.get("source", "csv"),
+                "value_in_mg_per_dl": float(row["Glucose_mg"]),
+                "trend": str(row.get("trend", "") or ""),
+                "source": str(row.get("source", "csv") or "csv"),
             })
         data = {
             "readings": readings,
@@ -334,9 +342,9 @@ def commit_cache_to_github(df: pd.DataFrame) -> tuple[bool, str]:
         for _, row in df.iterrows():
             readings.append({
                 "timestamp": row["Timestamp"].isoformat(),
-                "value_mg_dl": float(row["Glucose_mg"]),
-                "trend": str(row.get("trend", "STABLE")),
-                "source": str(row.get("source", "csv")),
+                "value_in_mg_per_dl": float(row["Glucose_mg"]),
+                "trend": str(row.get("trend", "") or ""),
+                "source": str(row.get("source", "csv") or "csv"),
             })
         data = {
             "readings": readings,

@@ -93,7 +93,7 @@ def fetch_readings(client) -> list[dict]:
             ts_calgary = ts_utc.astimezone(CALGARY_TZ).replace(tzinfo=None)
             readings.append({
                 "timestamp": ts_calgary.isoformat(),
-                "value_mg_dl": float(r.value_in_mg_per_dl),
+                "value_in_mg_per_dl": float(r.value_in_mg_per_dl),
                 "trend": "",
                 "source": "live",
             })
@@ -111,7 +111,7 @@ def fetch_readings(client) -> list[dict]:
             ts_calgary = ts_utc.astimezone(CALGARY_TZ).replace(tzinfo=None)
             readings.append({
                 "timestamp": ts_calgary.isoformat(),
-                "value_mg_dl": float(latest.value_in_mg_per_dl),
+                "value_in_mg_per_dl": float(latest.value_in_mg_per_dl),
                 "trend": trend_val,
                 "source": "live",
             })
