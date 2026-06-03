@@ -5,6 +5,10 @@ on:
     # Run every 5 minutes, 24/7
     - cron: '*/5 * * * *'
   workflow_dispatch:  # Allow manual trigger from GitHub UI
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'cache.json'   # Don't re-trigger when only cache.json changes
 
 permissions:
   contents: write  # Allow committing cache.json back to the repo
@@ -13,12 +17,16 @@ jobs:
   poll:
     runs-on: ubuntu-latest
     timeout-minutes: 4  # Prevent runaway jobs
+    # Skip if the commit message says [skip poll] — avoids infinite loops
+    if: "!contains(github.event.head_commit.message, '[skip poll]')"
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GH_PAT }}
+          # Always fetch the latest cache.json from remote
+          fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -44,6 +52,6 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to cache.json, skipping commit."
           else
-            git commit -m "chore: update glucose cache [skip ci]"
+            git commit -m "chore: update glucose cache [skip poll]"
             git push
           fi
