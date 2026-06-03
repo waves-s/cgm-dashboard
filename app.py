@@ -28,7 +28,7 @@ st.markdown("""
 <style>
 .main { background-color: #ffffff; }
 .main .block-container {
-    padding-top: 0.25rem !important;
+    padding-top: 0 !important;
     padding-bottom: 0.5rem !important;
     max-width: 100% !important;
 }
@@ -41,6 +41,14 @@ header[data-testid="stHeader"] {
     min-height: 0 !important;
     padding: 0 !important;
     visibility: hidden !important;
+    display: none !important;
+}
+/* Remove Streamlit's default top app padding */
+.appview-container .main .block-container {
+    padding-top: 0 !important;
+}
+div[data-testid="stAppViewContainer"] > section > div:first-child {
+    padding-top: 0 !important;
 }
 h1 { margin-top: 0 !important; margin-bottom: 0.3rem !important; font-size: 1.4rem !important; }
 h2 { margin-top: 0.2rem !important; margin-bottom: 0.2rem !important; }
@@ -617,7 +625,7 @@ if st.session_state.authenticated and st.session_state.selected_patient:
 
 # ─── Main Content ─────────────────────────────────────────────────────────────
 st.markdown(
-    '<div style="margin-top:-1.5rem;margin-bottom:0.2rem;">'
+    '<div style="margin-top:-3rem;padding-top:0.5rem;margin-bottom:0.2rem;">'
     '<span style="font-size:1.3rem;font-weight:800;">📊 CGM Dashboard</span>'
     '</div>',
     unsafe_allow_html=True
@@ -779,19 +787,19 @@ with tab_chart:
 
         # ── Calendar date picker (Day view only) ──────────────────────────────
         if st.session_state.nav_view == "day" and available_dates:
-            if st.session_state.get("cal_picker") != anchor_date:
-                st.session_state["cal_picker"] = anchor_date
             cal_col1, cal_col2 = st.columns([1, 3])
             with cal_col1:
                 st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to date:</div>',
                             unsafe_allow_html=True)
             with cal_col2:
+                # value= always reflects current anchor_date so the widget stays in sync.
+                # When user picks a different date, picked != anchor_date triggers rerun.
                 picked = st.date_input(
                     "jump_date",
+                    value=anchor_date,
                     min_value=data_min_date,
                     max_value=data_max_date,
                     label_visibility="collapsed",
-                    key="cal_picker",
                 )
                 if picked != anchor_date:
                     new_offset = (picked - data_max_date).days
@@ -882,7 +890,6 @@ with tab_chart:
                         yaxis2=dict(title="Glucose (mmol/L)", range=[y_min_mmol, y_max_mmol],
                                     overlaying="y", side="right", showgrid=False),
                         legend=dict(orientation="h", y=1.05),
-                        margin=dict(l=0, r=60, t=30, b=50),
                     )
                 else:
                     if unit_choice == "mmol/L":
@@ -920,7 +927,6 @@ with tab_chart:
                     layout_extra = dict(
                         yaxis=dict(title=y_label, range=y_range),
                         showlegend=False,
-                        margin=dict(l=0, r=0, t=30, b=50),
                     )
 
                 xaxis_cfg = dict(rangeslider=dict(visible=False), title="Time")
@@ -931,9 +937,11 @@ with tab_chart:
                 if show_zoom_buttons and zoom_annotation:
                     annotations.append(zoom_annotation)
 
+                # t=55 gives room for zoom buttons (rangeselector) without overlapping date label
+                right_margin = 60 if unit_choice == "Both" else 0
                 fig.update_layout(
-                    title=dict(text=day_label, font=dict(size=13, color="#1a73e8"), x=0, xanchor="left"),
                     hovermode="x unified", height=420, template="plotly_white",
+                    margin=dict(l=0, r=right_margin, t=55, b=50),
                     xaxis=xaxis_cfg,
                     annotations=annotations,
                     **layout_extra,
