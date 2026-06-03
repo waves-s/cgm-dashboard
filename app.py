@@ -153,27 +153,6 @@ for key, default in {
     if key not in st.session_state:
         st.session_state[key] = default
 
-# ─── Auto-Login from Streamlit Secrets ────────────────────────────────────────
-# Attempt silent authentication on first page load so visitors never see a login form.
-if not st.session_state.authenticated and not st.session_state.auto_login_attempted:
-    st.session_state.auto_login_attempted = True
-    try:
-        # Support both [libreview] table and flat LIBREVIEW_* keys
-        if "libreview" in st.secrets:
-            _auto_email    = st.secrets["libreview"]["email"]
-            _auto_password = st.secrets["libreview"]["password"]
-        elif "LIBREVIEW_EMAIL" in st.secrets:
-            _auto_email    = st.secrets["LIBREVIEW_EMAIL"]
-            _auto_password = st.secrets["LIBREVIEW_PASSWORD"]
-        else:
-            _auto_email = _auto_password = None
-
-        if _auto_email and _auto_password:
-            authenticate(_auto_email, _auto_password, "US")
-            # authenticate() sets st.session_state.authenticated = True on success
-    except Exception:
-        pass  # Secrets not configured — fall back to manual login form
-
 # ─── Helper Functions ──────────────────────────────────────────────────────────
 TREND_LABELS = {
     Trend.DOWN_FAST: "↓↓",
@@ -492,6 +471,28 @@ def get_full_df() -> pd.DataFrame:
     live_df = readings_to_df(live_readings)
 
     return merge_with_cache(live_df, cache_df)
+
+# ─── Auto-Login from Streamlit Secrets ────────────────────────────────────────
+# Attempt silent authentication on first page load so visitors never see a login form.
+# authenticate() is now defined above, so this call is safe.
+if not st.session_state.authenticated and not st.session_state.auto_login_attempted:
+    st.session_state.auto_login_attempted = True
+    try:
+        # Support both [libreview] table and flat LIBREVIEW_* keys
+        if "libreview" in st.secrets:
+            _auto_email    = st.secrets["libreview"]["email"]
+            _auto_password = st.secrets["libreview"]["password"]
+        elif "LIBREVIEW_EMAIL" in st.secrets:
+            _auto_email    = st.secrets["LIBREVIEW_EMAIL"]
+            _auto_password = st.secrets["LIBREVIEW_PASSWORD"]
+        else:
+            _auto_email = _auto_password = None
+
+        if _auto_email and _auto_password:
+            authenticate(_auto_email, _auto_password, "US")
+            # authenticate() sets st.session_state.authenticated = True on success
+    except Exception:
+        pass  # Secrets not configured — fall back to manual login form
 
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
