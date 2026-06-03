@@ -806,27 +806,50 @@ with tab_chart:
                 unsafe_allow_html=True
             )
 
-        # ── Calendar date picker (Day view only) ──────────────────────────────
-        if st.session_state.nav_view == "day" and available_dates:
+        # ── Calendar date picker (Day and Week view) ──────────────────────────
+        if available_dates:
             cal_col1, cal_col2 = st.columns([1, 3])
             with cal_col1:
-                st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to date:</div>',
-                            unsafe_allow_html=True)
+                if st.session_state.nav_view == "day":
+                    st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to date:</div>',
+                                unsafe_allow_html=True)
+                else:
+                    st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to week of:</div>',
+                                unsafe_allow_html=True)
             with cal_col2:
-                # value= always reflects current anchor_date so the widget stays in sync.
-                # When user picks a different date, picked != anchor_date triggers rerun.
-                picked = st.date_input(
-                    "jump_date",
-                    value=anchor_date,
-                    min_value=data_min_date,
-                    max_value=data_max_date,
-                    label_visibility="collapsed",
-                )
-                if picked != anchor_date:
-                    new_offset = (picked - data_max_date).days
-                    st.session_state.nav_offset_days = max(min_offset, min(0, new_offset))
-                    st.session_state.show_last_24h = False
-                    st.rerun()
+                if st.session_state.nav_view == "day":
+                    # Day view: pick any date
+                    picked = st.date_input(
+                        "jump_date",
+                        value=anchor_date,
+                        min_value=data_min_date,
+                        max_value=data_max_date,
+                        label_visibility="collapsed",
+                        key="cal_picker_day",
+                    )
+                    if picked != anchor_date:
+                        new_offset = (picked - data_max_date).days
+                        st.session_state.nav_offset_days = max(min_offset, min(0, new_offset))
+                        st.session_state.show_last_24h = False
+                        st.rerun()
+                else:
+                    # Week view: pick any date — will snap to the Monday of that week
+                    current_week_start = anchor_date - timedelta(days=anchor_date.weekday())
+                    picked_week = st.date_input(
+                        "jump_week",
+                        value=current_week_start,
+                        min_value=data_min_date,
+                        max_value=data_max_date,
+                        label_visibility="collapsed",
+                        key="cal_picker_week",
+                    )
+                    # Snap to Monday of the picked week
+                    picked_week_monday = picked_week - timedelta(days=picked_week.weekday())
+                    if picked_week_monday != current_week_start:
+                        new_offset = (picked_week_monday - data_max_date).days
+                        st.session_state.nav_offset_days = max(min_offset, min(0, new_offset))
+                        st.session_state.show_last_24h = False
+                        st.rerun()
 
         chart_df = wide_df[
             (wide_df["Timestamp"] >= window_start) &
