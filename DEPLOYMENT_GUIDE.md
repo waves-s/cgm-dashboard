@@ -1,112 +1,114 @@
-# CGM Dashboard — Streamlit Cloud Deployment Guide
+# CGM Dashboard — Deployment & Setup Guide
 
-## Your GitHub Repository
+## Overview
 
-Your code is live at:
-**https://github.com/waves-s/cgm-dashboard**
+This dashboard shows your LibreView CGM readings in real time with full historical data. It works in two parts:
 
----
-
-## Step-by-Step: Deploy to Streamlit Cloud
-
-### Step 1 — Sign up / Log in to Streamlit Cloud
-
-1. Go to **https://share.streamlit.io**
-2. Click **"Sign in with GitHub"**
-3. Authorize Streamlit to access your GitHub account (wavess@gmail.com)
+1. **GitHub Actions background poller** — runs every 5 minutes, 24/7, fetching your latest readings from LibreView and storing them in `cache.json` in this repo. This happens even when you are not looking at the dashboard.
+2. **Streamlit web dashboard** — reads from the cache on every load, shows live readings, trend charts, and statistics.
 
 ---
 
-### Step 2 — Create a New App
+## Step 1 — Deploy to Streamlit Cloud
 
-1. Once logged in, click **"New app"** (top right)
-2. Fill in the form:
+1. Go to **https://share.streamlit.io** and sign in with your GitHub account
+2. Click **"New app"**
+3. Fill in:
    - **Repository**: `waves-s/cgm-dashboard`
    - **Branch**: `main`
    - **Main file path**: `app.py`
-3. Click **"Deploy!"**
+4. Click **"Deploy!"**
+
+You will get a public shareable URL like:
+`https://waves-s-cgm-dashboard-app-xxxxx.streamlit.app`
 
 ---
 
-### Step 3 — Add Your LibreView Credentials (Secrets)
+## Step 2 — Add LibreView Credentials to Streamlit Cloud
 
-> This is the secure way to store your password — it is encrypted and never visible in code.
-
-1. After deploying, go to your app's **Settings** (gear icon ⚙️)
-2. Click **"Secrets"** in the left menu
-3. Paste the following into the secrets box:
+1. In Streamlit Cloud, go to your app → **Settings** → **Secrets**
+2. Paste the following (replace with your actual credentials after changing your password):
 
 ```toml
 [libreview]
 email = "rddhawan@yahoo.com"
-password = "YOUR_NEW_PASSWORD_HERE"
+password = "YOUR_NEW_LIBREVIEW_PASSWORD"
 ```
 
-> **Important**: Use your **new** LibreView password (please change it first at https://www.libreview.com)
+3. Click **Save**
 
-4. Click **"Save"**
-5. The app will automatically restart and your credentials will be loaded securely
+> ⚠️ **Important:** Change your LibreView password at https://www.libreview.com before adding it here.
 
 ---
 
-### Step 4 — Get Your Shareable Link
+## Step 3 — Verify GitHub Actions is Running
 
-Once deployed, Streamlit gives you a public URL like:
-```
-https://waves-s-cgm-dashboard-app-xxxxxx.streamlit.app
-```
+The background poller should already be running. To verify:
 
-You can **share this link with anyone** — they will see your live glucose dashboard without needing to log in again (the credentials are stored in secrets on the server side).
+1. Go to **https://github.com/waves-s/cgm-dashboard/actions**
+2. You should see the **"CGM Background Poller"** workflow running every 5 minutes
+3. Each run fetches your latest readings and commits them to `cache.json`
+
+The workflow uses these GitHub Secrets (already configured):
+- `LIBREVIEW_EMAIL` — your LibreView email
+- `LIBREVIEW_PASSWORD` — your LibreView password
+- `GH_PAT` — a GitHub personal access token with `repo` + `workflow` scopes
 
 ---
 
-## How to Use the Dashboard
+## Step 4 — (Optional) Seed Historical Data
 
-| Feature | How to Access |
+The background poller builds history from today forward. If you want data from before today:
+
+1. Go to **https://www.libreview.com** → log in → **Glucose History** → **Download glucose data**
+2. Download the CSV file
+3. Open your Streamlit dashboard → sidebar → **📁 Historical Data** → upload the CSV
+
+The app will merge it with the existing cache. You only need to do this once.
+
+---
+
+## How It Works Day-to-Day
+
+| Scenario | What happens |
 |---|---|
-| **Current Reading** | Shown at the top with trend arrow and status badge |
-| **Trend Chart** | Click the "📈 Trend Chart" tab — use the slider to adjust time window |
-| **Scrollable Readings** | Click the "📋 All Readings" tab — scroll through full history |
-| **Statistics** | Click the "📊 Statistics" tab — avg, min, max, time-in-range, daily chart |
-| **Auto-Refresh** | In the sidebar, select refresh interval (1, 5, 10, 15, or 30 min) |
-| **Manual Refresh** | Click "Refresh Now" in the sidebar |
+| You open the dashboard | App loads `cache.json` (up to 6 months of readings) + fetches latest live data |
+| You have not visited in a week | GitHub Actions has been polling every 5 min — all readings are in `cache.json` |
+| You share the URL | Anyone with the link can view your dashboard in real time |
+| You want to refresh manually | Click **🔄 Refresh Now** in the sidebar |
 
 ---
 
-## Glucose Range Reference
+## Dashboard Features
 
-| Zone | Range | Color |
-|---|---|---|
-| Low | < 70 mg/dL | 🟠 Orange |
-| In Range | 70–180 mg/dL | 🟢 Green |
-| High | > 180 mg/dL | 🔴 Red |
-
----
-
-## Troubleshooting
-
-| Issue | Solution |
+| Feature | Details |
 |---|---|
-| "Authentication failed" | Check your LibreView email/password in Secrets |
-| "Privacy Policy error" | Open the LibreLink app and accept the latest privacy policy |
-| "Terms of Use error" | Open the LibreLink app and accept the latest terms |
-| "Rate limited" | Wait a few minutes and refresh — LibreView limits API calls |
-| No data showing | Make sure your CGM sensor is active and synced to LibreView |
+| **Live Reading** | Large glucose number with trend arrow and status badge (LOW / IN RANGE / HIGH) |
+| **Trend Chart** | Interactive Plotly chart with target zone, Zoom: 3h/6h/12h/24h buttons |
+| **Day/Week Navigation** | ⏮ ◀ ▶ ⏭ buttons + calendar date picker |
+| **Units** | mg/dL, mmol/L, or Both (dual Y-axis) |
+| **Custom Target Range** | Adjustable Low/High thresholds in your chosen units |
+| **All Readings Tab** | Scrollable table of all readings with colour-coded rows |
+| **Statistics Tab** | Average, min/max, time-in-range donut chart, daily average bar chart |
+| **Auto-Refresh** | Configurable: 1, 5, 10, 15, or 30 minutes |
 
 ---
 
 ## Security Notes
 
-- Your LibreView credentials are stored **encrypted** in Streamlit Cloud Secrets
-- They are **never** stored in the GitHub repository
-- The GitHub token used to push code has **already expired** (30-day token, used once)
-- It is strongly recommended to **change your LibreView password** since it was shared in chat
+- Your LibreView credentials are stored as **encrypted GitHub Secrets** — never visible in code
+- The Streamlit app reads credentials from **Streamlit Cloud Secrets** (also encrypted)
+- The GitHub token (`GH_PAT`) only has access to this specific repository
+- **Please change your LibreView password** if it was shared in plain text
 
 ---
 
-## Need to Update the App?
+## Troubleshooting
 
-If you want to make changes to the dashboard in the future:
-1. Edit `app.py` directly on GitHub (click the file → pencil icon ✏️)
-2. Commit the change
-3. Streamlit Cloud will automatically redeploy within ~1 minute
+| Issue | Fix |
+|---|---|
+| Login fails with "Redirected to api-ca.libreview.io" | Leave region as US — the app auto-redirects |
+| Chart shows no data | Check GitHub Actions is running at `/actions`; wait 5 min for first poll |
+| "No patients found" error | Your LibreView account may need to be linked to a sensor in the LibreLink app |
+| GitHub Actions failing | Check Secrets are set correctly at `/settings/secrets/actions` |
+| "Rate limited" warning | Wait a few minutes — LibreView limits API calls |
