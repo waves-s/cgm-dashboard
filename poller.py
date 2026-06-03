@@ -98,10 +98,13 @@ def fetch_readings(client) -> list[dict]:
     try:
         latest = client.latest(patient_identifier=patient.patient_id)
         if latest:
+            trend_val = ""
+            if hasattr(latest, 'trend') and latest.trend is not None:
+                trend_val = latest.trend.name if hasattr(latest.trend, 'name') else str(latest.trend)
             readings.append({
                 "timestamp": latest.factory_timestamp.isoformat(),
                 "value_mg_dl": float(latest.value_in_mg_per_dl),
-                "trend": latest.trend_arrow.name if hasattr(latest.trend_arrow, 'name') else str(latest.trend_arrow),
+                "trend": trend_val,
                 "source": "live",
             })
     except Exception as e:
