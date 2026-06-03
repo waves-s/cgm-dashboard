@@ -149,6 +149,7 @@ for key, default in {
     "cache_df": None,         # Full merged DataFrame from cache.json
     "show_last_24h": True,    # Default: show last 24h on first load
     "auto_login_attempted": False,  # Only try auto-login once per session
+    "rate_limit_until": 0,            # Timestamp when rate limit expires
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -222,7 +223,8 @@ def fetch_data(patient):
         st.session_state.last_update    = datetime.now(CALGARY_TZ)
         return True
     except LLUAPIRateLimitError as e:
-        st.warning(f"Rate limited. Retry after {e.retry_after}s.")
+        # Store when we're allowed to retry — suppress the warning from the UI
+        st.session_state.rate_limit_until = datetime.now(CALGARY_TZ).timestamp() + (e.retry_after or 300)
         return False
     except Exception as e:
         st.error(f"Error fetching data: {e}")
@@ -637,16 +639,18 @@ with st.sidebar:
 
 # ─── Auto-refresh ─────────────────────────────────────────────────────────────
 # Always fetch live data on every page load/refresh when authenticated.
-# This ensures the chart is always up to date regardless of GitHub Actions schedule.
+# Respects LibreView rate limits silently — no warning shown to user.
 if st.session_state.authenticated and st.session_state.selected_patient:
+    _now_ts = datetime.now(CALGARY_TZ).timestamp()
+    _rate_ok = _now_ts >= st.session_state.get("rate_limit_until", 0)
     if st.session_state.last_update is None:
-        with st.spinner("Loading latest readings…"):
-            fetch_data(st.session_state.selected_patient)
+        if _rate_ok:
+            with st.spinner("Loading latest readings…"):
+                fetch_data(st.session_state.selected_patient)
     else:
-        # Re-fetch on every page load (Streamlit reruns), but throttle to at most
-        # once every 60 seconds to avoid hammering the LibreView API on rapid reruns
+        # Re-fetch on every page load, throttled to once every 60s
         elapsed = (datetime.now(CALGARY_TZ) - st.session_state.last_update).total_seconds()
-        if elapsed >= 60:
+        if elapsed >= 60 and _rate_ok:
             fetch_data(st.session_state.selected_patient)
 
 # ─── Main Content ─────────────────────────────────────────────────────────────
@@ -1168,7 +1172,9 @@ if st.session_state.authenticated:
     @st.fragment(run_every=_refresh_secs)
     def _auto_refresh_fragment():
         """Runs every N seconds; fetches new data and triggers a full page rerun."""
-        if st.session_state.authenticated and st.session_state.selected_patient:
+        _now = datetime.now(CALGARY_TZ).timestamp()
+        _ok  = _now >= st.session_state.get("rate_limit_until", 0)
+        if st.session_state.authenticated and st.session_state.selected_patient and _ok:
             fetch_data(st.session_state.selected_patient)
             st.rerun()
 
