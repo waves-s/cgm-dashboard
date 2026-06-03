@@ -247,12 +247,18 @@ def load_cache_df() -> pd.DataFrame:
             return pd.DataFrame()
         df = pd.DataFrame(readings)
         df.rename(columns={"timestamp": "Timestamp", "value_mg_dl": "Glucose_mg"}, inplace=True)
-        # Timestamps in cache.json are stored as UTC ISO strings; convert to Calgary time
-        df["Timestamp"] = (
-            pd.to_datetime(df["Timestamp"], utc=True, errors="coerce")
-            .dt.tz_convert(CALGARY_TZ)
-            .dt.tz_localize(None)  # drop tzinfo for consistent naive-local treatment
-        )
+        # Timestamps in cache.json are Calgary local naive strings (no UTC conversion needed).
+        # If a timestamp has a UTC offset (legacy entries), convert it to Calgary naive.
+        def parse_ts(ts_str):
+            try:
+                ts = pd.Timestamp(ts_str)
+                if ts.tzinfo is not None:
+                    # Has timezone info — convert to Calgary naive
+                    return ts.tz_convert(CALGARY_TZ).tz_localize(None)
+                return ts  # already naive Calgary local
+            except Exception:
+                return pd.NaT
+        df["Timestamp"] = df["Timestamp"].apply(parse_ts)
         df = df.dropna(subset=["Timestamp", "Glucose_mg"])
         df["Glucose_mg"] = pd.to_numeric(df["Glucose_mg"], errors="coerce")
         df = df.dropna(subset=["Glucose_mg"])
@@ -401,27 +407,10 @@ def parse_libreview_csv(uploaded_file) -> pd.DataFrame:
 
         # Build result DataFrame
         result = pd.DataFrame()
-        # LibreView CSV exports timestamps in the account's local time (Calgary/Mountain Time).
-        # We parse them as naive datetimes and then localize element-by-element using
-        # nonexistent="shift_forward" and ambiguous="NaT" to safely handle DST transitions
-        # across multiple years without the "3 dst switches" error from pandas batch inference.
-        raw_ts = pd.to_datetime(df[ts_col], errors="coerce", dayfirst=False)
-
-        def _localize_calgary(ts):
-            """Localize a single naive Timestamp to Calgary time, handling DST edge cases."""
-            if pd.isna(ts):
-                return pd.NaT
-            try:
-                # Replace tzinfo directly using zoneinfo — handles DST correctly per-timestamp
-                return ts.replace(tzinfo=CALGARY_TZ)
-            except Exception:
-                return pd.NaT
-
-        localized = raw_ts.apply(_localize_calgary)
-        # Drop the tzinfo so the result is naive Calgary-local (matching API data in the app)
-        result["Timestamp"] = localized.apply(
-            lambda t: t.replace(tzinfo=None) if not pd.isna(t) else pd.NaT
-        )
+        # CONFIRMED: LibreView CSV timestamps are already in the device/account local time
+        # (Calgary Mountain Time). Parse as naive datetimes — no timezone conversion needed.
+        # dayfirst=True handles the DD-MM-YYYY format used by LibreView.
+        result["Timestamp"] = pd.to_datetime(df[ts_col], errors="coerce", dayfirst=True)
         result = result.dropna(subset=["Timestamp"])
 
         if glucose_col_mg:

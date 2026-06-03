@@ -88,8 +88,11 @@ def fetch_readings(client) -> list[dict]:
         # Use patient.patient_id (the connection UUID) as the identifier
         graph_readings = client.graph(patient_identifier=patient.patient_id)
         for r in graph_readings:
+            # Convert UTC timestamp to Calgary local naive ISO string
+            ts_utc = r.factory_timestamp
+            ts_calgary = ts_utc.astimezone(CALGARY_TZ).replace(tzinfo=None)
             readings.append({
-                "timestamp": r.factory_timestamp.isoformat(),
+                "timestamp": ts_calgary.isoformat(),
                 "value_mg_dl": float(r.value_in_mg_per_dl),
                 "trend": "",
                 "source": "live",
@@ -104,8 +107,10 @@ def fetch_readings(client) -> list[dict]:
             trend_val = ""
             if hasattr(latest, 'trend') and latest.trend is not None:
                 trend_val = latest.trend.name if hasattr(latest.trend, 'name') else str(latest.trend)
+            ts_utc = latest.factory_timestamp
+            ts_calgary = ts_utc.astimezone(CALGARY_TZ).replace(tzinfo=None)
             readings.append({
-                "timestamp": latest.factory_timestamp.isoformat(),
+                "timestamp": ts_calgary.isoformat(),
                 "value_mg_dl": float(latest.value_in_mg_per_dl),
                 "trend": trend_val,
                 "source": "live",
