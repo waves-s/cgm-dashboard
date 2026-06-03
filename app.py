@@ -1158,3 +1158,18 @@ with tab_stats:
             margin=dict(l=0, r=0, t=20, b=0),
         )
         st.plotly_chart(fig_daily, use_container_width=True)
+
+# ─── Auto-Refresh Timer ───────────────────────────────────────────────────────
+# Use st.fragment(run_every=N) to silently re-fetch live data in the background
+# without blocking the page or requiring a manual browser refresh.
+if st.session_state.authenticated:
+    _refresh_secs = refresh_interval * 60
+
+    @st.fragment(run_every=_refresh_secs)
+    def _auto_refresh_fragment():
+        """Runs every N seconds; fetches new data and triggers a full page rerun."""
+        if st.session_state.authenticated and st.session_state.selected_patient:
+            fetch_data(st.session_state.selected_patient)
+            st.rerun()
+
+    _auto_refresh_fragment()
