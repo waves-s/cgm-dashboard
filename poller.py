@@ -62,11 +62,11 @@ def authenticate(email: str, password: str):
         redirect_url = str(e).strip()
         for api_url in APIUrl:
             if api_url.value in redirect_url:
-                client2 = PyLibreLinkUp(email=email, password=password, url=api_url)
+                client2 = PyLibreLinkUp(email=email, password=password, api_url=api_url)
                 client2.authenticate()
                 return client2
         # Try CA as default for Canadian accounts
-        client_ca = PyLibreLinkUp(email=email, password=password, url=APIUrl.CA)
+        client_ca = PyLibreLinkUp(email=email, password=password, api_url=APIUrl.CA)
         client_ca.authenticate()
         return client_ca
 
