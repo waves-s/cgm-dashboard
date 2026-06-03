@@ -1,18 +1,6 @@
 {
   "readings": [
     {
-      "timestamp": "2025-05-16T03:45:00",
-      "value_mg_dl": 109.91,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-16T04:00:00",
-      "value_mg_dl": 106.31,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
       "timestamp": "2025-05-16T04:15:00",
       "value_mg_dl": 104.5,
       "trend": "STABLE",
@@ -315013,6 +315001,12 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-06-03T00:36:29",
+      "value_in_mg_per_dl": 93.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-03T00:40:29",
       "value_in_mg_per_dl": 92.0,
       "trend": "STABLE",
@@ -315046,6 +315040,12 @@
       "timestamp": "2026-06-03T00:51:29+00:00",
       "value_mg_dl": 89.0,
       "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-03T00:53:29",
+      "value_in_mg_per_dl": 86.0,
+      "trend": "STABLE",
       "source": "live"
     },
     {
@@ -315361,7 +315361,7 @@
       "source": "live"
     }
   ],
-  "last_updated": "2026-06-03T00:51:43.501832-06:00",
+  "last_updated": "2026-06-03T00:54:20.033085-06:00",
   "source": "live_api",
   "timezone_note": "All timestamps are Calgary local time (America/Edmonton). No conversion needed at display."
 }
