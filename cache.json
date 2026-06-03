@@ -1,24 +1,6 @@
 {
   "readings": [
     {
-      "timestamp": "2025-05-16T03:00:00",
-      "value_mg_dl": 124.32,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-16T03:15:00",
-      "value_mg_dl": 118.92,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-16T03:30:00",
-      "value_mg_dl": 111.71,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
       "timestamp": "2025-05-16T03:45:00",
       "value_mg_dl": 109.91,
       "trend": "STABLE",
@@ -315001,6 +314983,12 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-06-03T00:26:30",
+      "value_in_mg_per_dl": 95.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-03T00:26:30+00:00",
       "value_mg_dl": 93.0,
       "trend": "",
@@ -315009,6 +314997,12 @@
     {
       "timestamp": "2026-06-03T00:31:29+00:00",
       "value_mg_dl": 92.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-03T00:31:45",
+      "value_in_mg_per_dl": 95.0,
       "trend": "",
       "source": "live"
     },
@@ -315040,6 +315034,12 @@
       "timestamp": "2026-06-03T00:46:29+00:00",
       "value_mg_dl": 90.0,
       "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-03T00:51:29",
+      "value_in_mg_per_dl": 89.0,
+      "trend": "STABLE",
       "source": "live"
     },
     {
@@ -315361,7 +315361,7 @@
       "source": "live"
     }
   ],
-  "last_updated": "2026-06-03T00:42:58.507193-06:00",
+  "last_updated": "2026-06-03T00:51:43.501832-06:00",
   "source": "live_api",
   "timezone_note": "All timestamps are Calgary local time (America/Edmonton). No conversion needed at display."
 }
