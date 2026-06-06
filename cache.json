@@ -1,84 +1,6 @@
 {
   "readings": [
     {
-      "timestamp": "2025-05-28T08:27:00",
-      "value_mg_dl": 95.5,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T08:42:00",
-      "value_mg_dl": 91.89,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T08:57:00",
-      "value_mg_dl": 91.89,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T09:12:00",
-      "value_mg_dl": 97.3,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T09:27:00",
-      "value_mg_dl": 102.7,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T09:42:00",
-      "value_mg_dl": 102.7,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T09:57:00",
-      "value_mg_dl": 100.9,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T10:13:00",
-      "value_mg_dl": 97.3,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T10:28:00",
-      "value_mg_dl": 97.3,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T10:43:00",
-      "value_mg_dl": 100.9,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T10:58:00",
-      "value_mg_dl": 100.9,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T11:13:00",
-      "value_mg_dl": 97.3,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
-      "timestamp": "2025-05-28T11:28:00",
-      "value_mg_dl": 97.3,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
       "timestamp": "2025-05-28T11:43:00",
       "value_mg_dl": 97.3,
       "trend": "STABLE",
@@ -315355,13 +315277,91 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-06-06T09:31:26",
+      "value_in_mg_per_dl": 94.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T09:36:25",
+      "value_in_mg_per_dl": 93.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T09:41:26",
+      "value_in_mg_per_dl": 95.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T09:46:27",
+      "value_in_mg_per_dl": 95.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-06T09:47:26",
+      "value_in_mg_per_dl": 90.0,
+      "trend": "STABLE",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T09:51:26",
+      "value_in_mg_per_dl": 96.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T09:56:26",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T10:01:26",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T10:06:25",
+      "value_in_mg_per_dl": 97.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T10:11:25",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T10:16:25",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T10:21:25",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T10:26:26",
+      "value_in_mg_per_dl": 95.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-06T10:45:25",
       "value_in_mg_per_dl": 90.0,
       "trend": "STABLE",
       "source": "live"
     }
   ],
-  "last_updated": "2026-06-06T09:48:09.329050-06:00",
+  "last_updated": "2026-06-06T10:51:40.301310-06:00",
   "source": "live_api",
   "timezone_note": "All timestamps are Calgary local time (America/Edmonton). No conversion needed at display."
 }
