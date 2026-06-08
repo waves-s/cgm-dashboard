@@ -1396,7 +1396,7 @@ with tab_renpho:
 
         with ctrl3:
             # Fix 1: dynamic date range — styled label to make it obvious it's interactive
-            range_options = {"All time": 0, "1 week": 7, "2 weeks": 14, "1 month": 30,
+            range_options = {"All time": 0, "1 week": 7, "2 weeks": 14, "1 month": 30, "2 months": 60,
                              "3 months": 90, "6 months": 180, "1 year": 365}
             st.markdown("**📅 Select Date Range**")
             range_label = st.selectbox(
@@ -1498,16 +1498,6 @@ with tab_renpho:
                         annotation_font_size=10,
                         annotation_font_color="#555",
                     )
-                    # Filled area under the delta line
-                    fig.add_trace(go.Scatter(
-                        x=col_data["Timestamp"],
-                        y=col_data["Delta"],
-                        fill="tozeroy",
-                        fillcolor=FILL_BLUE,
-                        line=dict(color="rgba(0,0,0,0)"),
-                        showlegend=False,
-                        hoverinfo="skip",
-                    ))
                     # Main delta line with markers
                     fig.add_trace(go.Scatter(
                         x=col_data["Timestamp"],
