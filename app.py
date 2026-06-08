@@ -130,9 +130,10 @@ section[data-testid="stSidebar"] .stButton > button {
 """, unsafe_allow_html=True)
 
 # ─── Constants ────────────────────────────────────────────────────────────────
-MG_TO_MMOL  = 0.0555
-CACHE_FILE  = Path(__file__).parent / "cache.json"
-CALGARY_TZ  = ZoneInfo("America/Edmonton")  # Calgary / Mountain Time (MDT/MST)
+MG_TO_MMOL        = 0.0555
+CACHE_FILE        = Path(__file__).parent / "cache.json"
+RENPHO_CACHE_FILE = Path(__file__).parent / "renpho_cache.json"
+CALGARY_TZ        = ZoneInfo("America/Edmonton")  # Calgary / Mountain Time (MDT/MST)
 
 # ─── Session State Initialization ─────────────────────────────────────────────
 for key, default in {
@@ -150,6 +151,11 @@ for key, default in {
     "show_last_24h": True,    # Default: show last 24h on first load
     "auto_login_attempted": False,  # Only try auto-login once per session
     "rate_limit_until": 0,            # Timestamp when rate limit expires
+    "renpho_df": None,                 # Cached Renpho DataFrame
+    "renpho_selected_metrics": None,   # Selected metrics for Renpho chart
+    "renpho_weight_unit": "lb",         # Weight display unit: 'lb' or 'kg'
+    "renpho_date_range_days": 0,        # 0 = all time; otherwise number of days
+    "renpho_upload_done": False,        # Flag to suppress rerun loop after upload
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -387,6 +393,193 @@ def commit_cache_to_github(df: pd.DataFrame) -> tuple[bool, str]:
         return False, f"Commit failed: {e}"
 
 
+# ─── Renpho Cache Helpers ─────────────────────────────────────────────────────
+RENPHO_GITHUB_PATH = "renpho_cache.json"
+
+# Renpho metric definitions: (column_name_in_df, display_label, unit)
+RENPHO_METRICS = [
+    ("Weight_lb",           "Weight",             "lb"),
+    ("BMI",                 "BMI",                ""),
+    ("Body_Fat_pct",        "Body Fat",           "%"),
+    ("Fat_Free_Weight_lb",  "Fat-free Weight",    "lb"),
+    ("Subcutaneous_Fat_pct","Subcutaneous Fat",   "%"),
+    ("Visceral_Fat",        "Visceral Fat",       ""),
+    ("Body_Water_pct",      "Body Water",         "%"),
+    ("Skeletal_Muscle_pct", "Skeletal Muscle",    "%"),
+    ("Muscle_Mass_lb",      "Muscle Mass",        "lb"),
+    ("Bone_Mass_lb",        "Bone Mass",          "lb"),
+    ("Protein_pct",         "Protein",            "%"),
+    ("BMR_kcal",            "BMR",                "kcal"),
+    ("Metabolic_Age",       "Metabolic Age",      "yrs"),
+]
+RENPHO_METRIC_KEYS   = [m[0] for m in RENPHO_METRICS]
+RENPHO_METRIC_LABELS = {m[0]: m[1] for m in RENPHO_METRICS}
+RENPHO_METRIC_UNITS  = {m[0]: m[2] for m in RENPHO_METRICS}
+
+
+def parse_renpho_csv(uploaded_file) -> tuple[pd.DataFrame, str]:
+    """Parse a Renpho CSV export and return a normalised DataFrame."""
+    try:
+        content = uploaded_file.read().decode("utf-8", errors="replace")
+        df = pd.read_csv(io.StringIO(content))
+        df.columns = [c.strip() for c in df.columns]
+
+        # Find timestamp column
+        ts_col = next((c for c in df.columns if "time" in c.lower()), None)
+        if ts_col is None:
+            return pd.DataFrame(), "Could not find a time/date column in the Renpho CSV."
+
+        # Parse timestamps (Renpho format: 04/23/2026, 07:23:15)
+        df["Timestamp"] = pd.to_datetime(df[ts_col], format="%m/%d/%Y, %H:%M:%S", errors="coerce")
+        df = df.dropna(subset=["Timestamp"]).copy()
+
+        # Column mapping: Renpho CSV name → normalised name
+        col_map = {
+            "Weight(lb)":                "Weight_lb",
+            "BMI":                       "BMI",
+            "Body Fat(%)": "Body_Fat_pct",
+            "Fat-free Body Weight(lb)":  "Fat_Free_Weight_lb",
+            "Subcutaneous Fat(%)": "Subcutaneous_Fat_pct",
+            "Visceral Fat":              "Visceral_Fat",
+            "Body Water(%)": "Body_Water_pct",
+            "Skeletal Muscle(%)": "Skeletal_Muscle_pct",
+            "Muscle Mass(lb)":           "Muscle_Mass_lb",
+            "Bone Mass(lb)":             "Bone_Mass_lb",
+            "Protein(%)": "Protein_pct",
+            "BMR(kcal)":                 "BMR_kcal",
+            "Metabolic Age":             "Metabolic_Age",
+        }
+        for src, dst in col_map.items():
+            if src in df.columns:
+                df[dst] = pd.to_numeric(df[src].replace("--", pd.NA), errors="coerce")
+
+        # Keep only known metric columns + Timestamp
+        keep = ["Timestamp"] + [c for c in RENPHO_METRIC_KEYS if c in df.columns]
+        df = df[keep].copy()
+
+        # Sort and deduplicate — keep the row with the most non-null values per timestamp
+        df = df.sort_values("Timestamp")
+        df = df.loc[df.notna().sum(axis=1).groupby(df["Timestamp"]).transform("max") == df.notna().sum(axis=1)]
+        df = df.drop_duplicates(subset="Timestamp", keep="last").reset_index(drop=True)
+
+        if df.empty:
+            return pd.DataFrame(), "No valid readings found in Renpho CSV."
+        return df, ""
+    except Exception as e:
+        return pd.DataFrame(), f"Error parsing Renpho CSV: {e}"
+
+
+def load_renpho_df() -> pd.DataFrame:
+    """Load renpho_cache.json from disk into a DataFrame."""
+    if st.session_state.renpho_df is not None:
+        return st.session_state.renpho_df
+    if not RENPHO_CACHE_FILE.exists():
+        return pd.DataFrame()
+    try:
+        with open(RENPHO_CACHE_FILE, "r") as f:
+            data = json.load(f)
+        rows = data.get("readings", [])
+        if not rows:
+            return pd.DataFrame()
+        df = pd.DataFrame(rows)
+        df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
+        df = df.dropna(subset=["Timestamp"]).sort_values("Timestamp").reset_index(drop=True)
+        for col in RENPHO_METRIC_KEYS:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors="coerce")
+        st.session_state.renpho_df = df
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+
+def save_renpho_cache(df: pd.DataFrame) -> bool:
+    """Save Renpho DataFrame to renpho_cache.json on disk."""
+    try:
+        readings = []
+        for _, row in df.iterrows():
+            entry = {"Timestamp": row["Timestamp"].isoformat()}
+            for col in RENPHO_METRIC_KEYS:
+                if col in row and pd.notna(row[col]):
+                    entry[col] = float(row[col])
+                else:
+                    entry[col] = None
+            readings.append(entry)
+        data = {
+            "readings": readings,
+            "last_updated": datetime.now(CALGARY_TZ).isoformat(),
+            "source": "renpho_csv",
+        }
+        with open(RENPHO_CACHE_FILE, "w") as f:
+            json.dump(data, f, indent=2)
+        st.session_state.renpho_df = df
+        return True
+    except Exception as e:
+        st.error(f"Could not save Renpho cache: {e}")
+        return False
+
+
+def commit_renpho_to_github(df: pd.DataFrame) -> tuple[bool, str]:
+    """Commit renpho_cache.json to GitHub repo via Contents API."""
+    try:
+        gh_token = st.secrets.get("github", {}).get("pat") or st.secrets.get("GH_PAT", "")
+        if not gh_token:
+            return False, "GitHub token not found in secrets."
+
+        readings = []
+        for _, row in df.iterrows():
+            entry = {"Timestamp": row["Timestamp"].isoformat()}
+            for col in RENPHO_METRIC_KEYS:
+                if col in row and pd.notna(row[col]):
+                    entry[col] = float(row[col])
+                else:
+                    entry[col] = None
+            readings.append(entry)
+        data = {
+            "readings": readings,
+            "last_updated": datetime.now(CALGARY_TZ).isoformat(),
+            "source": "renpho_csv",
+        }
+        content_str = json.dumps(data, indent=2)
+        content_b64 = base64.b64encode(content_str.encode()).decode()
+
+        headers = {
+            "Authorization": f"token {gh_token}",
+            "Accept": "application/vnd.github+json",
+            "X-GitHub-Api-Version": "2022-11-28",
+        }
+        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{RENPHO_GITHUB_PATH}"
+        get_resp = requests.get(api_url, headers=headers, params={"ref": GITHUB_BRANCH}, timeout=15)
+        sha = get_resp.json().get("sha") if get_resp.status_code == 200 else None
+
+        payload = {
+            "message": f"seed: upload {len(readings):,} Renpho measurements via dashboard",
+            "content": content_b64,
+            "branch": GITHUB_BRANCH,
+        }
+        if sha:
+            payload["sha"] = sha
+
+        put_resp = requests.put(api_url, headers=headers, json=payload, timeout=30)
+        if put_resp.status_code in (200, 201):
+            return True, f"✅ {len(readings):,} Renpho measurements committed to GitHub — visible to everyone."
+        else:
+            detail = put_resp.json().get("message", put_resp.text[:200])
+            return False, f"GitHub API error {put_resp.status_code}: {detail}"
+    except Exception as e:
+        return False, f"Commit failed: {e}"
+
+
+def merge_renpho(existing: pd.DataFrame, new_df: pd.DataFrame) -> pd.DataFrame:
+    """Merge two Renpho DataFrames, deduplicate by Timestamp, keep newest."""
+    if existing.empty:
+        return new_df
+    combined = pd.concat([existing, new_df], ignore_index=True)
+    combined = combined.sort_values("Timestamp")
+    combined = combined.drop_duplicates(subset="Timestamp", keep="last").reset_index(drop=True)
+    return combined
+
+
 def parse_libreview_csv(uploaded_file) -> pd.DataFrame:
     """
     Parse a LibreView CSV export file.
@@ -599,36 +792,11 @@ with st.sidebar:
                 )
                 st.rerun()
 
-    # ── Admin: manual login (hidden at bottom, only shown when not auto-logged in) ──
-    if not st.session_state.authenticated:
-        st.markdown("---")
-        with st.expander("🔐 Admin Login", expanded=False):
-            _email    = st.text_input("LibreView Email", placeholder="you@example.com", key="manual_email")
-            _password = st.text_input("Password", type="password", key="manual_password")
-            _region   = st.selectbox("Region", options=["US", "EU", "EU2", "CA", "AU", "AE", "DE", "FR", "JP", "RU"], index=0, key="manual_region")
-            if st.button("Login", use_container_width=True, type="primary", key="manual_login_btn"):
-                if _email and _password:
-                    with st.spinner("Authenticating…"):
-                        ok, err = authenticate(_email, _password, _region)
-                    if ok:
-                        st.success("Logged in!")
-                        st.rerun()
-                    else:
-                        st.error(err)
-                else:
-                    st.warning("Please enter email and password.")
-    else:
-        if len(st.session_state.patients) > 1:
-            patient_names = [f"{p.first_name} {p.last_name}" for p in st.session_state.patients]
-            idx = st.selectbox("Patient", range(len(patient_names)), format_func=lambda i: patient_names[i])
-            st.session_state.selected_patient = st.session_state.patients[idx]
-        st.markdown("---")
-        if st.button("🚪 Logout", use_container_width=True):
-            for k in ["api", "authenticated", "patients", "selected_patient",
-                      "latest_reading", "graph_data", "logbook_data", "last_update"]:
-                st.session_state[k] = None if k in ["api", "selected_patient", "latest_reading", "last_update"] else []
-            st.session_state.authenticated = False
-            st.rerun()
+    # Patient selector (only shown when multiple patients exist on the account)
+    if st.session_state.authenticated and len(st.session_state.patients) > 1:
+        patient_names = [f"{p.first_name} {p.last_name}" for p in st.session_state.patients]
+        idx = st.selectbox("Patient", range(len(patient_names)), format_func=lambda i: patient_names[i])
+        st.session_state.selected_patient = st.session_state.patients[idx]
 
 # ─── Auto-refresh ─────────────────────────────────────────────────────────────
 # Always fetch live data on every page load/refresh when authenticated.
@@ -719,7 +887,7 @@ if latest is not None:
     st.markdown("---")
 
 # ─── Tabs ─────────────────────────────────────────────────────────────────────
-tab_chart, tab_readings, tab_stats = st.tabs(["📈 Trend Chart", "📋 All Readings", "📊 Statistics"])
+tab_chart, tab_readings, tab_stats, tab_renpho = st.tabs(["📈 CGM Chart", "📋 CGM All Readings", "📊 CGM Statistics", "⚖️ Body Composition Renpho"])
 
 # ─── Get Full Merged Data ─────────────────────────────────────────────────────
 full_df = get_full_df()
@@ -1181,6 +1349,307 @@ with tab_stats:
             margin=dict(l=0, r=0, t=20, b=0),
         )
         st.plotly_chart(fig_daily, use_container_width=True)
+
+# ─── Renpho Body Composition Tab ────────────────────────────────────────────────
+with tab_renpho:
+    renpho_df = load_renpho_df()
+
+    # ── Weight unit toggle ───────────────────────────────────────────────────────
+    LB_TO_KG = 0.453592
+
+    def _convert_weight(df, to_unit):
+        """Return a copy of df with lb-based weight columns converted if needed."""
+        df = df.copy()
+        if to_unit == "kg":
+            for col in ["Weight_lb", "Fat_Free_Weight_lb", "Muscle_Mass_lb", "Bone_Mass_lb"]:
+                if col in df.columns:
+                    df[col] = df[col] * LB_TO_KG
+        return df
+
+    # ── Metric selector ──────────────────────────────────────────────────────────
+    available_metrics = [m for m in RENPHO_METRIC_KEYS if not renpho_df.empty and m in renpho_df.columns and renpho_df[m].notna().any()]
+
+    # Fix 3: default to ALL available metrics
+    if st.session_state.renpho_selected_metrics is None:
+        st.session_state.renpho_selected_metrics = available_metrics[:]
+
+    if not renpho_df.empty:
+        # ── Controls row ─────────────────────────────────────────────────────────
+        ctrl1, ctrl2, ctrl3 = st.columns([3, 1, 1])
+
+        with ctrl1:
+            selected = st.multiselect(
+                "Select metrics to chart:",
+                options=available_metrics,
+                default=[m for m in st.session_state.renpho_selected_metrics if m in available_metrics],
+                format_func=lambda k: RENPHO_METRIC_LABELS.get(k, k),
+                key="renpho_metric_select",
+            )
+            st.session_state.renpho_selected_metrics = selected
+
+        with ctrl2:
+            # Fix 4: weight unit toggle
+            w_unit = st.radio("Weight unit", ["lb", "kg"], horizontal=True,
+                              index=0 if st.session_state.renpho_weight_unit == "lb" else 1,
+                              key="renpho_w_unit_radio")
+            st.session_state.renpho_weight_unit = w_unit
+
+        with ctrl3:
+            # Fix 1: dynamic date range — styled label to make it obvious it's interactive
+            range_options = {"All time": 0, "1 week": 7, "2 weeks": 14, "1 month": 30,
+                             "3 months": 90, "6 months": 180, "1 year": 365}
+            st.markdown("**📅 Select Date Range**")
+            range_label = st.selectbox(
+                "Filter by date range:",
+                list(range_options.keys()),
+                index=0,
+                key="renpho_range_sel",
+                label_visibility="collapsed",
+                help="Filter charts to show only measurements within this time window",
+            )
+            range_days = range_options[range_label]
+            st.session_state.renpho_date_range_days = range_days
+
+        # ── Date filter ──────────────────────────────────────────────────────────
+        plot_df = _convert_weight(renpho_df, w_unit)
+        now_dt  = datetime.now(CALGARY_TZ).replace(tzinfo=None)
+        if range_days > 0:
+            plot_df = plot_df[plot_df["Timestamp"] >= now_dt - pd.Timedelta(days=range_days)]
+
+        # Dynamic unit labels after conversion
+        def _unit_for(metric):
+            base = RENPHO_METRIC_UNITS[metric]
+            if base == "lb" and w_unit == "kg":
+                return "kg"
+            return base
+
+        # Birth year for chronological age baseline
+        BIRTH_YEAR = 1960
+
+        # ── Summary stats row ────────────────────────────────────────────────────
+        if selected:
+            stat_cols = st.columns(min(len(selected), 4))
+            for i, metric in enumerate(selected[:4]):
+                col_data = plot_df[metric].dropna()
+                if not col_data.empty:
+                    label = RENPHO_METRIC_LABELS[metric]
+                    unit  = _unit_for(metric)
+                    latest_val = col_data.iloc[-1]
+                    first_val  = col_data.iloc[0]
+                    delta      = latest_val - first_val
+                    with stat_cols[i % 4]:
+                        if metric == "Metabolic_Age":
+                            # Show metabolic age vs chronological age
+                            latest_ts   = plot_df.loc[plot_df[metric].notna(), "Timestamp"].iloc[-1]
+                            chron_age   = latest_ts.year - BIRTH_YEAR
+                            met_delta   = int(round(latest_val - chron_age))
+                            delta_str   = f"{met_delta:+d} yrs vs. chronological age {chron_age}"
+                            st.metric(
+                                label="Metabolic Age",
+                                value=f"{int(round(latest_val))} yrs",
+                                delta=delta_str,
+                                delta_color="inverse",  # positive delta (older) = red
+                            )
+                        else:
+                            st.metric(
+                                label=label,
+                                value=f"{latest_val:.1f} {unit}".strip(),
+                                delta=f"{delta:+.1f} {unit}".strip(),
+                                delta_color="inverse" if metric in ("Weight_lb", "Body_Fat_pct", "Visceral_Fat", "Subcutaneous_Fat_pct", "BMI") else "normal",
+                            )
+            st.markdown("")
+
+        # ── Charts — one per selected metric ────────────────────────────────────
+        if selected and not plot_df.empty:
+            for metric in selected:
+                col_data = plot_df[["Timestamp", metric]].dropna(subset=[metric])
+                if col_data.empty:
+                    continue
+                label   = RENPHO_METRIC_LABELS[metric]
+                unit    = _unit_for(metric)
+                y_label = f"{label} ({unit})" if unit else label
+
+                # ── Special chart for Metabolic Age — delta only ──────────────
+                if metric == "Metabolic_Age":
+                    col_data = col_data.copy()
+                    col_data["Chron_Age"] = col_data["Timestamp"].apply(
+                        lambda ts: ts.year - BIRTH_YEAR + (ts.month - 1) / 12
+                    )
+                    col_data["Delta"] = col_data[metric] - col_data["Chron_Age"]
+
+                    latest_delta = col_data["Delta"].iloc[-1]
+                    delta_color  = "#d32f2f" if latest_delta > 0 else "#2e7d32"
+                    delta_sign   = f"+{latest_delta:.1f}" if latest_delta > 0 else f"{latest_delta:.1f}"
+
+                    # Colour each bar by sign
+                    bar_colors = col_data["Delta"].apply(
+                        lambda d: "rgba(211,47,47,0.75)" if d > 0 else "rgba(46,125,50,0.75)"
+                    )
+                    delta_labels = col_data["Delta"].apply(
+                        lambda d: f"+{d:.1f} yrs" if d > 0 else f"{d:.1f} yrs"
+                    )
+
+                    fig = go.Figure()
+                    # Zero reference line ("same as chronological age")
+                    fig.add_hline(
+                        y=0, line_width=1.5, line_dash="dash", line_color="#555",
+                        annotation_text="= Chronological age",
+                        annotation_position="bottom right",
+                        annotation_font_size=10,
+                        annotation_font_color="#555",
+                    )
+                    # Filled area under the delta line
+                    fig.add_trace(go.Scatter(
+                        x=col_data["Timestamp"],
+                        y=col_data["Delta"],
+                        fill="tozeroy",
+                        fillcolor="rgba(211,47,47,0.10)" if latest_delta > 0 else "rgba(46,125,50,0.10)",
+                        line=dict(color="rgba(0,0,0,0)"),
+                        showlegend=False,
+                        hoverinfo="skip",
+                    ))
+                    # Main delta line with markers — hover shows +/- yrs at every point
+                    fig.add_trace(go.Scatter(
+                        x=col_data["Timestamp"],
+                        y=col_data["Delta"],
+                        mode="lines+markers",
+                        name="± Chronological Age",
+                        line=dict(color=delta_color, width=2),
+                        marker=dict(
+                            size=5,
+                            color=col_data["Delta"].apply(
+                                lambda d: "#d32f2f" if d > 0 else "#2e7d32"
+                            ),
+                        ),
+                        customdata=delta_labels,
+                        hovertemplate="%{x|%b %d, %Y}<br><b>%{customdata}</b><extra></extra>",
+                    ))
+                    # Trend line (7-pt rolling avg)
+                    if len(col_data) >= 7:
+                        col_data["delta_roll"] = col_data["Delta"].rolling(7, center=True, min_periods=3).mean()
+                        fig.add_trace(go.Scatter(
+                            x=col_data["Timestamp"],
+                            y=col_data["delta_roll"],
+                            mode="lines",
+                            name="Trend (7-pt avg)",
+                            line=dict(color="#e65c00", width=2, dash="dot"),
+                            hoverinfo="skip",
+                        ))
+                    # Annotation at the latest point
+                    fig.add_annotation(
+                        x=col_data["Timestamp"].iloc[-1],
+                        y=latest_delta,
+                        text=f"<b>{delta_sign} yrs now</b>",
+                        showarrow=True, arrowhead=2,
+                        ax=50, ay=-35,
+                        font=dict(color=delta_color, size=12),
+                        bgcolor="white", bordercolor=delta_color, borderwidth=1,
+                    )
+                    fig.update_layout(
+                        yaxis_title="± Chronological Age (yrs)",
+                        yaxis=dict(tickformat="+.0f", zeroline=False),
+                        height=320,
+                        template="plotly_white",
+                        margin=dict(l=0, r=0, t=45, b=0),
+                        hovermode="x unified",
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                        title=dict(
+                            text=f"Metabolic Age Gap  <span style='color:{delta_color};font-size:14px'>{delta_sign} yrs currently</span>",
+                            font=dict(size=14), x=0,
+                        ),
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    continue
+
+                # ── Standard chart for all other metrics ─────────────────────────
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(
+                    x=col_data["Timestamp"],
+                    y=col_data[metric],
+                    mode="lines+markers",
+                    name=label,
+                    line=dict(color="#1a73e8", width=2),
+                    marker=dict(size=5),
+                    hovertemplate=f"%{{x|%b %d, %Y}}<br>{label}: %{{y:.1f}} {unit}<extra></extra>",
+                ))
+                if len(col_data) >= 7:
+                    col_data = col_data.copy()
+                    col_data["rolling"] = col_data[metric].rolling(7, center=True, min_periods=3).mean()
+                    fig.add_trace(go.Scatter(
+                        x=col_data["Timestamp"],
+                        y=col_data["rolling"],
+                        mode="lines",
+                        name="Trend (7-pt avg)",
+                        line=dict(color="#e65c00", width=2, dash="dot"),
+                        hoverinfo="skip",
+                    ))
+                fig.update_layout(
+                    yaxis_title=y_label,
+                    height=260,
+                    template="plotly_white",
+                    margin=dict(l=0, r=0, t=30, b=0),
+                    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+                    title=dict(text=label, font=dict(size=14), x=0),
+                )
+                st.plotly_chart(fig, use_container_width=True)
+        elif not selected:
+            st.info("Select at least one metric above to display charts.")
+
+        # ── Full data table ──────────────────────────────────────────────────────
+        with st.expander("📋 View full Renpho data table", expanded=False):
+            display_df = _convert_weight(renpho_df, w_unit)
+            display_df["Date & Time"] = display_df["Timestamp"].dt.strftime("%Y-%m-%d %H:%M")
+            show_cols = ["Date & Time"] + [m for m in RENPHO_METRIC_KEYS if m in display_df.columns]
+            rename_map = {m: f"{RENPHO_METRIC_LABELS[m]} ({_unit_for(m)})" if _unit_for(m) else RENPHO_METRIC_LABELS[m] for m in RENPHO_METRIC_KEYS}
+            st.dataframe(
+                display_df[show_cols].rename(columns=rename_map).sort_values("Date & Time", ascending=False),
+                use_container_width=True,
+                height=400,
+            )
+
+    else:
+        st.info("No Renpho data loaded yet. Upload a Renpho CSV export below to get started.")
+
+    # ── CSV Upload ───────────────────────────────────────────────────────────────
+    st.markdown("---")
+    st.markdown("### 📤 Upload New Renpho Data")
+    st.info(
+        "**Have a newer Renpho export?** Upload it here to add new measurements. "
+        "Existing data is preserved — only new readings are added. "
+        "Once uploaded, the data is permanently saved to GitHub and visible to everyone."
+    )
+    st.caption("Export from the Renpho app: **Profile → Data → Export CSV**")
+    renpho_upload = st.file_uploader(
+        "Upload new Renpho CSV export",
+        type=["csv"],
+        key="renpho_uploader",
+        help="Only new measurements not already in the database will be added.",
+    )
+    if renpho_upload is not None and not st.session_state.renpho_upload_done:
+        st.session_state.renpho_upload_done = True
+        with st.spinner("Parsing Renpho CSV…"):
+            new_df, err = parse_renpho_csv(renpho_upload)
+        if err:
+            st.error(f"CSV error: {err}")
+            st.session_state.renpho_upload_done = False
+        elif new_df.empty:
+            st.warning("No valid measurements found in the uploaded file.")
+            st.session_state.renpho_upload_done = False
+        else:
+            existing_renpho = load_renpho_df()
+            merged_renpho   = merge_renpho(existing_renpho, new_df)
+            added = len(merged_renpho) - len(existing_renpho)
+            with st.spinner(f"Saving {len(merged_renpho):,} measurements to GitHub…"):
+                ok, msg = commit_renpho_to_github(merged_renpho)
+            save_renpho_cache(merged_renpho)
+            st.session_state.renpho_df = None   # force reload on next render
+            if ok:
+                st.success(f"{msg} +{added:,} new measurements added ({len(merged_renpho):,} total).")
+            else:
+                st.warning(f"⚠️ Could not commit to GitHub: {msg}\n\nData saved for this session only.")
+    elif renpho_upload is None:
+        # Reset flag when uploader is cleared so a new file can be processed
+        st.session_state.renpho_upload_done = False
 
 # ─── Auto-Refresh Timer ───────────────────────────────────────────────────────
 # Use st.fragment(run_every=N) to silently re-fetch live data in the background
