@@ -1,12 +1,6 @@
 {
   "readings": [
     {
-      "timestamp": "2025-06-04T02:33:00",
-      "value_mg_dl": 115.32,
-      "trend": "STABLE",
-      "source": "csv"
-    },
-    {
       "timestamp": "2025-06-04T02:48:00",
       "value_mg_dl": 111.71,
       "trend": "STABLE",
@@ -315359,9 +315353,15 @@
       "value_in_mg_per_dl": 136.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-06-08T13:01:22",
+      "value_in_mg_per_dl": 134.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-06-08T12:59:45.314336-06:00",
+  "last_updated": "2026-06-08T13:01:37.370887-06:00",
   "source": "live_api",
   "timezone_note": "All timestamps are Calgary local time (America/Edmonton). No conversion needed at display."
 }
