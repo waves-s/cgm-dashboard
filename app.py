@@ -1478,19 +1478,19 @@ with tab_renpho:
                     col_data["Delta"] = col_data[metric] - col_data["Chron_Age"]
 
                     latest_delta = col_data["Delta"].iloc[-1]
-                    delta_color  = "#d32f2f" if latest_delta > 0 else "#2e7d32"
                     delta_sign   = f"+{latest_delta:.1f}" if latest_delta > 0 else f"{latest_delta:.1f}"
 
-                    # Colour each bar by sign
-                    bar_colors = col_data["Delta"].apply(
-                        lambda d: "rgba(211,47,47,0.75)" if d > 0 else "rgba(46,125,50,0.75)"
-                    )
                     delta_labels = col_data["Delta"].apply(
                         lambda d: f"+{d:.1f} yrs" if d > 0 else f"{d:.1f} yrs"
                     )
 
+                    # Blue palette matching the CGM chart
+                    LINE_BLUE   = "#1f77b4"
+                    FILL_BLUE   = "rgba(31,119,180,0.12)"
+                    TREND_ORANGE = "#e65c00"
+
                     fig = go.Figure()
-                    # Zero reference line ("same as chronological age")
+                    # Zero reference line
                     fig.add_hline(
                         y=0, line_width=1.5, line_dash="dash", line_color="#555",
                         annotation_text="= Chronological age",
@@ -1503,28 +1503,23 @@ with tab_renpho:
                         x=col_data["Timestamp"],
                         y=col_data["Delta"],
                         fill="tozeroy",
-                        fillcolor="rgba(211,47,47,0.10)" if latest_delta > 0 else "rgba(46,125,50,0.10)",
+                        fillcolor=FILL_BLUE,
                         line=dict(color="rgba(0,0,0,0)"),
                         showlegend=False,
                         hoverinfo="skip",
                     ))
-                    # Main delta line with markers — hover shows +/- yrs at every point
+                    # Main delta line with markers
                     fig.add_trace(go.Scatter(
                         x=col_data["Timestamp"],
                         y=col_data["Delta"],
                         mode="lines+markers",
                         name="± Chronological Age",
-                        line=dict(color=delta_color, width=2),
-                        marker=dict(
-                            size=5,
-                            color=col_data["Delta"].apply(
-                                lambda d: "#d32f2f" if d > 0 else "#2e7d32"
-                            ),
-                        ),
+                        line=dict(color=LINE_BLUE, width=2),
+                        marker=dict(size=5, color=LINE_BLUE),
                         customdata=delta_labels,
                         hovertemplate="%{x|%b %d, %Y}<br><b>%{customdata}</b><extra></extra>",
                     ))
-                    # Trend line (7-pt rolling avg)
+                    # Trend line (7-pt rolling avg) — orange dotted, same as other charts
                     if len(col_data) >= 7:
                         col_data["delta_roll"] = col_data["Delta"].rolling(7, center=True, min_periods=3).mean()
                         fig.add_trace(go.Scatter(
@@ -1532,7 +1527,7 @@ with tab_renpho:
                             y=col_data["delta_roll"],
                             mode="lines",
                             name="Trend (7-pt avg)",
-                            line=dict(color="#e65c00", width=2, dash="dot"),
+                            line=dict(color=TREND_ORANGE, width=2, dash="dot"),
                             hoverinfo="skip",
                         ))
                     # Annotation at the latest point
@@ -1542,8 +1537,8 @@ with tab_renpho:
                         text=f"<b>{delta_sign} yrs now</b>",
                         showarrow=True, arrowhead=2,
                         ax=50, ay=-35,
-                        font=dict(color=delta_color, size=12),
-                        bgcolor="white", bordercolor=delta_color, borderwidth=1,
+                        font=dict(color=LINE_BLUE, size=12),
+                        bgcolor="white", bordercolor=LINE_BLUE, borderwidth=1,
                     )
                     fig.update_layout(
                         yaxis_title="± Chronological Age (yrs)",
@@ -1554,7 +1549,7 @@ with tab_renpho:
                         hovermode="x unified",
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
                         title=dict(
-                            text=f"Metabolic Age Gap  <span style='color:{delta_color};font-size:14px'>{delta_sign} yrs currently</span>",
+                            text=f"Metabolic Age Gap  <span style='color:{LINE_BLUE};font-size:14px'>{delta_sign} yrs currently</span>",
                             font=dict(size=14), x=0,
                         ),
                     )
