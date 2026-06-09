@@ -717,7 +717,7 @@ with st.sidebar:
     st.markdown("### 🎯 Target Range")
     if unit_choice == "mmol/L":
         low_default  = 3.0
-        high_default = 6.5
+        high_default = 6.0
         low_mmol  = st.number_input("Low (mmol/L)",  min_value=1.0, max_value=10.0, value=low_default,  step=0.1, format="%.1f")
         high_mmol = st.number_input("High (mmol/L)", min_value=5.0, max_value=25.0, value=high_default, step=0.1, format="%.1f")
         target_low_mg  = round(low_mmol  / MG_TO_MMOL)
@@ -1137,6 +1137,24 @@ with tab_chart:
                                   annotation_text=low_ann,  annotation_position="bottom right")
                     fig.add_hline(y=tgt_high, line_dash="dot", line_color="#cc0000",
                                   annotation_text=high_ann, annotation_position="top right")
+                    # Dashed grey reference lines at key glucose levels
+                    if unit_choice == "mmol/L":
+                        ref_vals = [4.0, 5.0, 6.0, 7.0, 8.0, 10.0, 12.0]
+                    else:
+                        ref_vals = [72, 90, 108, 126, 144, 180, 216]
+                    for rv in ref_vals:
+                        if rv not in (tgt_low, tgt_high):
+                            lbl = f"{rv:.1f}" if unit_choice == "mmol/L" else str(int(rv))
+                            fig.add_hline(
+                                y=rv,
+                                line_dash="dash",
+                                line_color="rgba(150,150,150,0.45)",
+                                line_width=1,
+                                annotation_text=lbl,
+                                annotation_position="right",
+                                annotation_font_size=9,
+                                annotation_font_color="#888",
+                            )
                     layout_extra = dict(
                         yaxis=dict(title=y_label, range=y_range),
                         showlegend=False,
