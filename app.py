@@ -331,6 +331,44 @@ GITHUB_REPO  = "waves-s/cgm-dashboard"
 GITHUB_PATH  = "cache.json"   # path inside the repo
 GITHUB_BRANCH = "main"
 
+def pull_cache_from_github() -> bool:
+    """
+    Download the latest cache.json from GitHub and overwrite the local file.
+    Called on every auto-refresh so the app always has fresh poller data.
+    Returns True if the local file was updated, False otherwise.
+    """
+    try:
+        gh_token = st.secrets.get("github", {}).get("pat") or st.secrets.get("GH_PAT", "")
+        headers = {"Accept": "application/vnd.github.raw"}
+        if gh_token:
+            headers["Authorization"] = f"token {gh_token}"
+        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_PATH}?ref={GITHUB_BRANCH}"
+        resp = requests.get(url, headers=headers, timeout=15)
+        if resp.status_code == 200:
+            new_data = resp.json()
+            # Compare total readings count to decide if an update is needed
+            new_count = len(new_data.get("readings", []))
+            old_count = 0
+            if CACHE_FILE.exists():
+                try:
+                    with open(CACHE_FILE) as f:
+                        old_data = json.load(f)
+                    old_count = len(old_data.get("readings", []))
+                    # Also compare latest timestamp
+                    old_latest = max((r["timestamp"] for r in old_data.get("readings", [])), default="")
+                    new_latest = max((r["timestamp"] for r in new_data.get("readings", [])), default="")
+                    if new_latest <= old_latest and new_count <= old_count:
+                        return False  # already up to date
+                except Exception:
+                    pass
+            with open(CACHE_FILE, "w") as f:
+                json.dump(new_data, f, indent=2)
+            return True
+        return False
+    except Exception:
+        return False
+
+
 def commit_cache_to_github(df: pd.DataFrame) -> tuple[bool, str]:
     """
     Serialise df to cache.json format and commit it directly to the GitHub repo
@@ -697,6 +735,9 @@ if not st.session_state.authenticated and not st.session_state.auto_login_attemp
     except Exception:
         pass  # Secrets not configured — fall back to manual login form
 
+# ─── Constants ───────────────────────────────────────────────────────────────
+REFRESH_INTERVAL_MINUTES = 5  # auto-refresh interval (minutes)
+
 # ─── Sidebar ──────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## 📊 CGM Dashboard")
@@ -730,20 +771,21 @@ with st.sidebar:
 
     st.markdown("---")
 
-    # ── Refresh (only when live API is connected) ──────────────────────────────
-    refresh_interval = 5  # fixed 5-minute auto-refresh
-    if st.session_state.authenticated:
-        st.markdown("### 🔄 Refresh")
-        if st.button("🔄 Refresh Now", use_container_width=True):
-            if st.session_state.selected_patient:
-                with st.spinner("Fetching latest readings…"):
-                    fetch_data(st.session_state.selected_patient)
-                st.rerun()
+    # ── Refresh ─────────────────────────────────────────────────────────────
+    st.markdown("### 🔄 Refresh")
+    if st.button("🔄 Refresh Now", use_container_width=True):
+        with st.spinner("Pulling latest data from GitHub & LibreView…"):
+            pull_cache_from_github()
+            if st.session_state.authenticated and st.session_state.selected_patient:
+                fetch_data(st.session_state.selected_patient)
+        st.rerun()
 
-        if st.session_state.last_update:
-            lu = st.session_state.last_update
-            tz_abbr = lu.strftime("%Z") if lu.tzinfo else "MT"
-            st.caption(f"Last fetched: {lu.strftime('%H:%M:%S')} {tz_abbr}")
+    if st.session_state.last_update:
+        lu = st.session_state.last_update
+        tz_abbr = lu.strftime("%Z") if lu.tzinfo else "MT"
+        st.caption(f"Last fetched: {lu.strftime('%H:%M:%S')} {tz_abbr}")
+
+    st.caption(f"⏱️ Auto-refreshes every {REFRESH_INTERVAL_MINUTES} min")
 
     # Show cache status
     cache_df_info = load_cache_df()
@@ -826,15 +868,39 @@ st.markdown(
 )
 st.markdown('<hr style="margin:4px 0 8px 0;">', unsafe_allow_html=True)
 
-# ─── Latest Reading Header (only when live API data is available) ─────────────
+# ─── Latest Reading Header ────────────────────────────────────────────────────
+# Show from live API if available, otherwise fall back to most recent cache entry
 latest = st.session_state.latest_reading
+_header_source = "live"
+_header_ts_str = None
 
-# Show live reading header only when live API data is available
 if latest is not None:
-    latest_mg = float(latest.value_in_mg_per_dl if latest.value_in_mg_per_dl else latest.value)
+    latest_mg  = float(latest.value_in_mg_per_dl if latest.value_in_mg_per_dl else latest.value)
     trend_obj  = latest.trend_arrow if hasattr(latest, 'trend_arrow') else None
     trend_text = TREND_LABELS.get(trend_obj, "→") if trend_obj else "→"
+    ts = latest.factory_timestamp if hasattr(latest, 'factory_timestamp') and latest.factory_timestamp else latest.timestamp
+    if hasattr(ts, 'astimezone'):
+        ts_calgary = ts.astimezone(CALGARY_TZ)
+        tz_abbr = ts_calgary.strftime("%Z")
+        _header_ts_str = ts_calgary.strftime(f"%b %d, %Y  %H:%M:%S {tz_abbr}")
+    else:
+        _header_ts_str = str(ts)
+else:
+    # Fall back to most recent cache entry
+    _cache_fb = load_cache_df()
+    if not _cache_fb.empty:
+        _last_row = _cache_fb.iloc[-1]
+        latest_mg  = float(_last_row["Glucose_mg"])
+        trend_text = "→"
+        _header_source = "cache"
+        _ts_fb = _last_row["Timestamp"]
+        _header_ts_str = _ts_fb.strftime("%b %d, %Y  %H:%M MT") + " (cached)"
+    else:
+        latest_mg = None
+
+if latest_mg is not None:
     status_label, glucose_class, badge_class = glucose_status(latest_mg, target_low_mg, target_high_mg)
+    reading_time_str = _header_ts_str or ""
 
     if unit_choice == "mmol/L":
         display_val  = f"{mg_to_mmol(latest_mg):.1f}"
@@ -845,14 +911,6 @@ if latest is not None:
     else:
         display_val  = f"{latest_mg:.0f}"
         display_unit = "mg/dL"
-
-    ts = latest.factory_timestamp if hasattr(latest, 'factory_timestamp') and latest.factory_timestamp else latest.timestamp
-    if hasattr(ts, 'astimezone'):
-        ts_calgary = ts.astimezone(CALGARY_TZ)
-        tz_abbr = ts_calgary.strftime("%Z")
-        reading_time_str = ts_calgary.strftime(f"%b %d, %Y  %H:%M:%S {tz_abbr}")
-    else:
-        reading_time_str = str(ts)
 
     col_glucose, col_trend, col_status, col_last = st.columns([2, 1, 1, 2])
     with col_glucose:
@@ -1655,18 +1713,26 @@ with tab_renpho:
         st.session_state.renpho_upload_done = False
 
 # ─── Auto-Refresh Timer ───────────────────────────────────────────────────────
-# Use st.fragment(run_every=N) to silently re-fetch live data in the background
-# without blocking the page or requiring a manual browser refresh.
-if st.session_state.authenticated:
-    _refresh_secs = refresh_interval * 60
+# Use st.fragment(run_every=N) to:
+#  1. Pull the latest cache.json from GitHub (so poller updates are seen immediately)
+#  2. Re-fetch live LibreView data if authenticated
+#  3. Trigger a full page rerun so charts update
+_refresh_secs = REFRESH_INTERVAL_MINUTES * 60
 
-    @st.fragment(run_every=_refresh_secs)
-    def _auto_refresh_fragment():
-        """Runs every N seconds; fetches new data and triggers a full page rerun."""
-        _now = datetime.now(CALGARY_TZ).timestamp()
-        _ok  = _now >= st.session_state.get("rate_limit_until", 0)
-        if st.session_state.authenticated and st.session_state.selected_patient and _ok:
-            fetch_data(st.session_state.selected_patient)
-            st.rerun()
+@st.fragment(run_every=_refresh_secs)
+def _auto_refresh_fragment():
+    """Runs every N seconds; pulls fresh cache from GitHub, fetches live data, reruns page."""
+    # Always pull the latest cache from GitHub — this is the primary data source
+    # since the GitHub Actions poller commits new readings there every ~5 min.
+    pull_cache_from_github()
 
-    _auto_refresh_fragment()
+    # Also try to fetch live data from LibreView API if authenticated
+    _now = datetime.now(CALGARY_TZ).timestamp()
+    _ok  = _now >= st.session_state.get("rate_limit_until", 0)
+    if st.session_state.authenticated and st.session_state.selected_patient and _ok:
+        fetch_data(st.session_state.selected_patient)
+
+    # Rerun to update charts with fresh data
+    st.rerun()
+
+_auto_refresh_fragment()
