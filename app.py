@@ -1237,16 +1237,13 @@ with tab_chart:
                     xaxis_cfg["rangeselector"] = rangeselector_cfg
 
                 # Apply 12h or 24h x-axis window
-                if x_range_hours == 12 and not day_df.empty:
-                    # Show 00:00-12:00 or 12:00-24:00 based on which half has more data
+                if x_range_hours in ("am", "pm") and not day_df.empty:
                     day_date = day_df["Timestamp"].dt.date.iloc[0]
                     midday   = datetime.combine(day_date, datetime.min.time()) + timedelta(hours=12)
-                    am_count = (day_df["Timestamp"] < midday).sum()
-                    pm_count = (day_df["Timestamp"] >= midday).sum()
-                    if am_count >= pm_count:
+                    if x_range_hours == "am":
                         x_start = datetime.combine(day_date, datetime.min.time())
                         x_end   = midday
-                    else:
+                    else:  # pm
                         x_start = midday
                         x_end   = datetime.combine(day_date, datetime.max.time())
                     xaxis_cfg["range"] = [x_start, x_end]
@@ -1298,11 +1295,11 @@ with tab_chart:
                     )
                 with _wv_ctrl2:
                     _cycle_h = st.radio(
-                        "Cycle", ["24h", "12h"], index=0, horizontal=True,
+                        "Cycle", ["24h", "AM (00–12)", "PM (12–00)"], index=0, horizontal=True,
                         key="week_cycle_hrs",
-                        help="Show full 24-hour day or just the busier 12-hour half"
+                        help="24h = full day | AM = midnight to noon | PM = noon to midnight"
                     )
-                    _x_hrs = 12 if _cycle_h == "12h" else 24
+                    _x_hrs = 24 if _cycle_h == "24h" else ("am" if "AM" in _cycle_h else "pm")
                 with _wv_ctrl3:
                     st.markdown(
                         f'<div style="padding-top:8px;font-size:13px;font-weight:600;'
