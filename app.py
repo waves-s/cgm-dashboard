@@ -691,8 +691,7 @@ def parse_libreview_csv(uploaded_file) -> tuple[pd.DataFrame, str]:
         lines = content.splitlines()
 
         # ── Detect format ──────────────────────────────────────────────────────
-        is_dexcom = any("Timestamp (YYYY-MM-DDThh:mm:ss)" in line or
-                        "Glucose Value (mg/dL)" in line for line in lines[:10])
+        is_dexcom = any("Timestamp (YYYY-MM-DDThh:mm:ss)" in line for line in lines[:10])
 
         if is_dexcom:
             # ── Dexcom Clarity format ──────────────────────────────────────────
@@ -701,9 +700,11 @@ def parse_libreview_csv(uploaded_file) -> tuple[pd.DataFrame, str]:
             df.columns = [c.strip() for c in df.columns]
 
             ts_col = next((c for c in df.columns if c.startswith("Timestamp")), None)
-            mg_col = next((c for c in df.columns if "Glucose Value (mg/dL)" in c), None)
+            # Support both mg/dL and mmol/L Dexcom exports
+            mg_col   = next((c for c in df.columns if "Glucose Value (mg/dL)" in c), None)
+            mmol_col = next((c for c in df.columns if "Glucose Value (mmol/L)" in c), None)
 
-            if ts_col is None or mg_col is None:
+            if ts_col is None or (mg_col is None and mmol_col is None):
                 return pd.DataFrame(), (
                     f"Dexcom Clarity CSV: could not find required columns. "
                     f"Found: {list(df.columns)}"
@@ -719,9 +720,16 @@ def parse_libreview_csv(uploaded_file) -> tuple[pd.DataFrame, str]:
             result["Timestamp"] = result["Timestamp"].dt.tz_localize(None)
             result = result.dropna(subset=["Timestamp"])
 
-            # Handle 'Low' / 'High' text values
-            raw_mg = df[mg_col].astype(str).str.strip()
-            result["Glucose_mg"] = raw_mg.replace({"Low": "40", "High": "400"}).pipe(pd.to_numeric, errors="coerce")
+            if mg_col:
+                # mg/dL column — handle 'Low' / 'High' text values
+                raw = df[mg_col].astype(str).str.strip()
+                result["Glucose_mg"] = raw.replace({"Low": "40", "High": "400"}).pipe(pd.to_numeric, errors="coerce")
+            else:
+                # mmol/L column — convert to mg/dL
+                raw = df[mmol_col].astype(str).str.strip()
+                mmol_vals = raw.replace({"Low": "2.2", "High": "22.2"}).pipe(pd.to_numeric, errors="coerce")
+                result["Glucose_mg"] = mmol_vals / MG_TO_MMOL
+
             result = result.dropna(subset=["Glucose_mg"])
             result["source"] = "dexcom_csv"
 
