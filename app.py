@@ -968,10 +968,13 @@ with tab_chart:
             _view_options = ["Day", "1 Week", "2 Weeks", "Month", "Compare"]
             _view_map     = {"day": 0, "week": 1, "2weeks": 2, "month": 3, "compare": 4}
             _view_idx     = _view_map.get(st.session_state.nav_view, 0)
-            view_mode = st.radio("View", _view_options, horizontal=True,
-                                  index=_view_idx, key="view_mode_radio")
-            st.session_state.nav_view = {"Day": "day", "1 Week": "week", "2 Weeks": "2weeks",
-                                         "Month": "month", "Compare": "compare"}[view_mode]
+            # No key= so Streamlit doesn't override session state on rerun
+            view_mode = st.radio("View", _view_options, horizontal=True, index=_view_idx)
+            _new_nav_view = {"Day": "day", "1 Week": "week", "2 Weeks": "2weeks",
+                             "Month": "month", "Compare": "compare"}[view_mode]
+            if _new_nav_view != st.session_state.nav_view:
+                st.session_state.nav_view = _new_nav_view
+                st.rerun()
 
         if st.session_state.nav_view in ("day", "compare"):
             min_offset = -(data_max_date - data_min_date).days
@@ -1076,33 +1079,36 @@ with tab_chart:
                 )
             with cal_col2:
                 if st.session_state.nav_view == "day":
+                    # Dynamic key forces re-init when anchor_date changes (e.g. after Latest button)
                     picked = st.date_input(
                         "jump_date", value=anchor_date,
                         min_value=data_min_date, max_value=data_max_date,
-                        label_visibility="collapsed", key="cal_picker_day",
+                        label_visibility="collapsed",
+                        key=f"cal_picker_day_{anchor_date.isoformat()}",
                     )
                     if picked != anchor_date:
                         st.session_state.nav_offset_days = max(min_offset, min(0, (picked - data_max_date).days))
                         st.session_state.show_last_24h = False
                         st.rerun()
                 elif st.session_state.nav_view == "month":
-                    # Month view: pick any date — snaps to 1st of that month
+                    _cur_month_1st = anchor_date.replace(day=1)
                     picked_m = st.date_input(
-                        "jump_month", value=anchor_date,
+                        "jump_month", value=_cur_month_1st,
                         min_value=data_min_date, max_value=data_max_date,
-                        label_visibility="collapsed", key="cal_picker_month",
+                        label_visibility="collapsed",
+                        key=f"cal_picker_month_{_cur_month_1st.isoformat()}",
                     )
                     picked_month_1st = picked_m.replace(day=1)
-                    if picked_month_1st != anchor_date.replace(day=1):
+                    if picked_month_1st != _cur_month_1st:
                         st.session_state.nav_offset_days = max(min_offset, min(0, (picked_month_1st - data_max_date).days))
                         st.session_state.show_last_24h = False
                         st.rerun()
                 else:
                     # Week / 2-week view: snap to Monday of picked week
                     current_week_start = anchor_date - timedelta(days=anchor_date.weekday())
-                    _wk_key = "cal_picker_2week" if st.session_state.nav_view == "2weeks" else "cal_picker_week"
+                    _wk_key = f"cal_picker_{'2week' if st.session_state.nav_view == '2weeks' else 'week'}_{current_week_start.isoformat()}"
                     picked_week = st.date_input(
-                        _wk_key, value=current_week_start,
+                        "jump_week", value=current_week_start,
                         min_value=data_min_date, max_value=data_max_date,
                         label_visibility="collapsed", key=_wk_key,
                     )
@@ -1933,17 +1939,20 @@ _refresh_secs = REFRESH_INTERVAL_MINUTES * 60
 @st.fragment(run_every=_refresh_secs)
 def _auto_refresh_fragment():
     """Runs every N seconds; pulls fresh cache from GitHub, fetches live data, reruns page."""
-    # Always pull the latest cache from GitHub — this is the primary data source
-    # since the GitHub Actions poller commits new readings there every ~5 min.
-    pull_cache_from_github()
+    # Pull the latest cache from GitHub — only rerun if new data arrived
+    _cache_updated = pull_cache_from_github()
 
     # Also try to fetch live data from LibreView API if authenticated
     _now = datetime.now(CALGARY_TZ).timestamp()
     _ok  = _now >= st.session_state.get("rate_limit_until", 0)
+    _live_updated = False
     if st.session_state.authenticated and st.session_state.selected_patient and _ok:
         fetch_data(st.session_state.selected_patient)
+        _live_updated = True
 
-    # Rerun to update charts with fresh data
-    st.rerun()
+    # Only trigger a full-page rerun if data actually changed
+    # This prevents the constant rerun loop when there is no new data
+    if _cache_updated or _live_updated:
+        st.rerun()
 
 _auto_refresh_fragment()
