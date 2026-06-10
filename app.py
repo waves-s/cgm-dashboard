@@ -340,24 +340,30 @@ def pull_cache_from_github() -> bool:
     """
     try:
         gh_token = st.secrets.get("github", {}).get("pat") or st.secrets.get("GH_PAT", "")
-        headers = {"Accept": "application/vnd.github.raw"}
+        headers = {}
         if gh_token:
             headers["Authorization"] = f"token {gh_token}"
-        url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_PATH}?ref={GITHUB_BRANCH}"
-        resp = requests.get(url, headers=headers, timeout=15)
+        # Use the raw download URL — works for large files (>1 MB) unlike the Contents API
+        # which base64-encodes and has a 1 MB limit.
+        raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/{GITHUB_PATH}"
+        resp = requests.get(raw_url, headers=headers, timeout=30)
         if resp.status_code == 200:
-            new_data = resp.json()
-            # Compare total readings count to decide if an update is needed
-            new_count = len(new_data.get("readings", []))
-            old_count = 0
+            try:
+                new_data = resp.json()
+            except Exception:
+                return False  # malformed JSON — don't overwrite local
+            # Compare only by latest timestamp (count comparison is unreliable
+            # if the poller was previously trimming old readings)
+            new_latest = max((r["timestamp"] for r in new_data.get("readings", [])), default="")
+            old_latest = ""
             if CACHE_FILE.exists():
                 try:
                     with open(CACHE_FILE) as f:
                         old_data = json.load(f)
-                    old_count = len(old_data.get("readings", []))
-                    # Also compare latest timestamp
                     old_latest = max((r["timestamp"] for r in old_data.get("readings", [])), default="")
-                    new_latest = max((r["timestamp"] for r in new_data.get("readings", [])), default="")
+                    # Also check if GitHub has more readings (e.g. after a CSV merge)
+                    old_count = len(old_data.get("readings", []))
+                    new_count = len(new_data.get("readings", []))
                     if new_latest <= old_latest and new_count <= old_count:
                         return False  # already up to date
                 except Exception:
