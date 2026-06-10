@@ -578785,6 +578785,24 @@
       "source": "dexcom_clarity_import"
     },
     {
+      "timestamp": "2026-05-21T05:14:08",
+      "value_in_mg_per_dl": 39.63963963963964,
+      "trend": "STABLE",
+      "source": "dexcom_csv"
+    },
+    {
+      "timestamp": "2026-05-21T05:19:08",
+      "value_in_mg_per_dl": 39.63963963963964,
+      "trend": "STABLE",
+      "source": "dexcom_csv"
+    },
+    {
+      "timestamp": "2026-05-21T05:24:08",
+      "value_in_mg_per_dl": 39.63963963963964,
+      "trend": "STABLE",
+      "source": "dexcom_csv"
+    },
+    {
       "timestamp": "2026-05-21T06:24:08",
       "value_in_mg_per_dl": 93.7,
       "trend": "",
@@ -625729,24 +625747,12 @@
       "source": "live"
     },
     {
-      "timestamp": "2026-06-10T12:41:19",
-      "value_in_mg_per_dl": 139.0,
-      "trend": "",
-      "source": "live"
-    },
-    {
       "timestamp": "2026-06-10T12:55:19",
       "value_in_mg_per_dl": 165.0,
       "trend": "UP_SLOW",
       "source": "live"
-    },
-    {
-      "timestamp": "2026-06-10T12:58:17",
-      "value_in_mg_per_dl": 171.0,
-      "trend": "UP_SLOW",
-      "source": "live"
     }
   ],
-  "last_updated": "2026-06-10T12:58:32.753472-06:00",
-  "source": "live_api"
+  "last_updated": "2026-06-10T12:59:40.034637-06:00",
+  "source": "merged"
 }
