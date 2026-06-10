@@ -964,10 +964,12 @@ with tab_chart:
 
         nav_col1, nav_col2, nav_col3, nav_col4, nav_col5, nav_col6 = st.columns([1.2, 1, 1, 1, 1, 2])
         with nav_col1:
-            view_mode = st.radio("View", ["Day", "Week"], horizontal=True,
-                                  index=0 if st.session_state.nav_view == "day" else 1,
-                                  key="view_mode_radio")
-            st.session_state.nav_view = view_mode.lower()
+            _view_options = ["Day", "1 Week", "2 Weeks"]
+            _view_map     = {"day": 0, "week": 1, "2weeks": 2}
+            _view_idx     = _view_map.get(st.session_state.nav_view, 0)
+            view_mode = st.radio("View", _view_options, horizontal=True,
+                                  index=_view_idx, key="view_mode_radio")
+            st.session_state.nav_view = {"Day": "day", "1 Week": "week", "2 Weeks": "2weeks"}[view_mode]
 
         if st.session_state.nav_view == "day":
             min_offset = -(data_max_date - data_min_date).days
@@ -985,7 +987,7 @@ with tab_chart:
                 st.rerun()
         with nav_col3:
             st.write("")
-            step = 1 if st.session_state.nav_view == "day" else 7
+            step = 1 if st.session_state.nav_view == "day" else (14 if st.session_state.nav_view == "2weeks" else 7)
             if st.button("◄ Back", use_container_width=True):
                 st.session_state.nav_offset_days = max(min_offset, offset - step)
                 st.session_state.show_last_24h = False
@@ -1020,11 +1022,16 @@ with tab_chart:
             # Any week navigation clears the 24h mode
             st.session_state.show_last_24h = False
             week_start   = anchor_date - timedelta(days=anchor_date.weekday())
-            week_end     = week_start + timedelta(days=6)
+            if st.session_state.nav_view == "2weeks":
+                week_end     = week_start + timedelta(days=13)
+                period_label = f"2 Weeks: {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
+                week_days    = [week_start + timedelta(days=i) for i in range(14)]
+            else:
+                week_end     = week_start + timedelta(days=6)
+                period_label = f"Week of {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
+                week_days    = [week_start + timedelta(days=i) for i in range(7)]
             window_start = datetime.combine(week_start, datetime.min.time())
             window_end   = datetime.combine(week_end,   datetime.max.time())
-            period_label = f"Week of {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
-            week_days    = [week_start + timedelta(days=i) for i in range(7)]
 
         with nav_col6:
             st.markdown(
@@ -1038,6 +1045,9 @@ with tab_chart:
             with cal_col1:
                 if st.session_state.nav_view == "day":
                     st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to date:</div>',
+                                unsafe_allow_html=True)
+                elif st.session_state.nav_view == "2weeks":
+                    st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to 2-week start:</div>',
                                 unsafe_allow_html=True)
                 else:
                     st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to week of:</div>',
@@ -1059,15 +1069,16 @@ with tab_chart:
                         st.session_state.show_last_24h = False
                         st.rerun()
                 else:
-                    # Week view: pick any date — will snap to the Monday of that week
+                    # Week / 2-week view: pick any date — will snap to the Monday of that week
                     current_week_start = anchor_date - timedelta(days=anchor_date.weekday())
+                    _wk_key = "cal_picker_2week" if st.session_state.nav_view == "2weeks" else "cal_picker_week"
                     picked_week = st.date_input(
-                        "jump_week",
+                        _wk_key,
                         value=current_week_start,
                         min_value=data_min_date,
                         max_value=data_max_date,
                         label_visibility="collapsed",
-                        key="cal_picker_week",
+                        key=_wk_key,
                     )
                     # Snap to Monday of the picked week
                     picked_week_monday = picked_week - timedelta(days=picked_week.weekday())
@@ -1100,8 +1111,11 @@ with tab_chart:
             def build_day_chart(day_df, day_label, unit_choice,
                                 target_low_mg, target_high_mg,
                                 target_low_mmol, target_high_mmol,
-                                show_zoom_buttons=True):
+                                show_zoom_buttons=True,
+                                chart_height=420,
+                                x_range_hours=24):
                 """Build a single-day Plotly figure with target bands and midnight dotted lines."""
+                # x_range_hours: 24 = full day, 12 = first half (00:00-12:00) or second half based on data
                 if day_df.empty:
                     return None
 
@@ -1222,15 +1236,31 @@ with tab_chart:
                 if show_zoom_buttons and rangeselector_cfg:
                     xaxis_cfg["rangeselector"] = rangeselector_cfg
 
+                # Apply 12h or 24h x-axis window
+                if x_range_hours == 12 and not day_df.empty:
+                    # Show 00:00-12:00 or 12:00-24:00 based on which half has more data
+                    day_date = day_df["Timestamp"].dt.date.iloc[0]
+                    midday   = datetime.combine(day_date, datetime.min.time()) + timedelta(hours=12)
+                    am_count = (day_df["Timestamp"] < midday).sum()
+                    pm_count = (day_df["Timestamp"] >= midday).sum()
+                    if am_count >= pm_count:
+                        x_start = datetime.combine(day_date, datetime.min.time())
+                        x_end   = midday
+                    else:
+                        x_start = midday
+                        x_end   = datetime.combine(day_date, datetime.max.time())
+                    xaxis_cfg["range"] = [x_start, x_end]
+
                 annotations = []
                 if show_zoom_buttons and zoom_annotation:
                     annotations.append(zoom_annotation)
 
                 # t=55 gives room for zoom buttons (rangeselector) without overlapping date label
                 right_margin = 60 if unit_choice == "Both" else 0
+                top_margin   = 40 if not show_zoom_buttons else 55
                 fig.update_layout(
-                    hovermode="x unified", height=420, template="plotly_white",
-                    margin=dict(l=0, r=right_margin, t=55, b=50),
+                    hovermode="x unified", height=chart_height, template="plotly_white",
+                    margin=dict(l=0, r=right_margin, t=top_margin, b=35),
                     xaxis=xaxis_cfg,
                     annotations=annotations,
                     **layout_extra,
@@ -1258,36 +1288,72 @@ with tab_chart:
 
             # ── Week View: one chart per day ──────────────────────────────────
             else:
-                st.markdown(
-                    f'<div style="font-size:13px;font-weight:600;color:#1a73e8;'
-                    f'background:#f0f4ff;border:1px solid #c5d3f5;border-radius:8px;'
-                    f'padding:5px 14px;display:inline-block;margin-bottom:10px;">'
-                    f'📆 {period_label}</div>',
-                    unsafe_allow_html=True
-                )
-                for day in week_days:
+                # ── Controls row: columns + cycle ─────────────────────────────
+                _wv_ctrl1, _wv_ctrl2, _wv_ctrl3 = st.columns([1.2, 1.2, 3])
+                with _wv_ctrl1:
+                    _n_cols = st.radio(
+                        "Columns", [2, 3], index=1, horizontal=True,
+                        key="week_grid_cols",
+                        help="Number of day charts per row"
+                    )
+                with _wv_ctrl2:
+                    _cycle_h = st.radio(
+                        "Cycle", ["24h", "12h"], index=0, horizontal=True,
+                        key="week_cycle_hrs",
+                        help="Show full 24-hour day or just the busier 12-hour half"
+                    )
+                    _x_hrs = 12 if _cycle_h == "12h" else 24
+                with _wv_ctrl3:
+                    st.markdown(
+                        f'<div style="padding-top:8px;font-size:13px;font-weight:600;'
+                        f'color:#1a73e8;background:#f0f4ff;border:1px solid #c5d3f5;'
+                        f'border-radius:8px;padding:5px 14px;display:inline-block;">'
+                        f'📆 {period_label}</div>',
+                        unsafe_allow_html=True
+                    )
+
+                # Chart height shrinks with more columns so they fit nicely
+                _grid_height = 255 if _n_cols == 3 else 295
+
+                # Render days in a responsive grid
+                _cols_iter = None
+                for _i, day in enumerate(week_days):
+                    if _i % _n_cols == 0:
+                        _cols_iter = st.columns(_n_cols)
+                    _col = _cols_iter[_i % _n_cols]
+
                     day_start = datetime.combine(day, datetime.min.time())
                     day_end   = datetime.combine(day, datetime.max.time())
                     day_df    = chart_df[
                         (chart_df["Timestamp"] >= day_start) &
                         (chart_df["Timestamp"] <= day_end)
                     ].copy()
-                    day_label = day.strftime("%A, %B %d, %Y")
-                    if day_df.empty:
-                        st.markdown(
-                            f'<div style="font-size:12px;color:#999;padding:4px 0;">{day_label} — no data</div>',
-                            unsafe_allow_html=True
-                        )
-                        continue
-                    fig = build_day_chart(
-                        day_df, day_label, unit_choice,
-                        target_low_mg, target_high_mg,
-                        target_low_mmol, target_high_mmol,
-                        show_zoom_buttons=False  # no zoom buttons in week view to keep it compact
-                    )
-                    if fig:
-                        st.plotly_chart(fig, use_container_width=True)
-                    st.markdown('<hr style="border-top:1px dashed #ccc;margin:4px 0 8px 0;">', unsafe_allow_html=True)
+                    day_label_str = day.strftime("%a %b %d")
+
+                    with _col:
+                        if day_df.empty:
+                            st.markdown(
+                                f'<div style="font-size:12px;color:#999;padding:20px 0;'
+                                f'text-align:center;border:1px dashed #ddd;border-radius:6px;'
+                                f'margin-bottom:6px;">{day_label_str}<br><em>no data</em></div>',
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            st.markdown(
+                                f'<div style="font-size:12px;font-weight:700;color:#333;'
+                                f'margin-bottom:2px;">{day_label_str}</div>',
+                                unsafe_allow_html=True
+                            )
+                            fig = build_day_chart(
+                                day_df, day_label_str, unit_choice,
+                                target_low_mg, target_high_mg,
+                                target_low_mmol, target_high_mmol,
+                                show_zoom_buttons=False,
+                                chart_height=_grid_height,
+                                x_range_hours=_x_hrs,
+                            )
+                            if fig:
+                                st.plotly_chart(fig, use_container_width=True)
 
 # ── Tab 2: Readings Table ─────────────────────────────────────────────────────
 with tab_readings:
