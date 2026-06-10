@@ -625453,6 +625453,12 @@
       "source": "csv"
     },
     {
+      "timestamp": "2026-06-10T10:46:18",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-10T10:51:00",
       "value_in_mg_per_dl": 99.09909909909909,
       "trend": "STABLE",
@@ -625461,7 +625467,7 @@
     {
       "timestamp": "2026-06-10T10:51:19",
       "value_in_mg_per_dl": 99.0,
-      "trend": "STABLE",
+      "trend": "",
       "source": "live"
     },
     {
@@ -625483,10 +625489,22 @@
       "source": "csv"
     },
     {
+      "timestamp": "2026-06-10T10:56:18",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-10T11:01:00",
       "value_in_mg_per_dl": 99.09909909909909,
       "trend": "STABLE",
       "source": "csv"
+    },
+    {
+      "timestamp": "2026-06-10T11:01:19",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
     },
     {
       "timestamp": "2026-06-10T11:02:18",
@@ -625501,10 +625519,22 @@
       "source": "csv"
     },
     {
+      "timestamp": "2026-06-10T11:06:17",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-10T11:11:00",
       "value_in_mg_per_dl": 99.09909909909909,
       "trend": "STABLE",
       "source": "csv"
+    },
+    {
+      "timestamp": "2026-06-10T11:11:17",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
     },
     {
       "timestamp": "2026-06-10T11:16:00",
@@ -625513,10 +625543,22 @@
       "source": "csv"
     },
     {
+      "timestamp": "2026-06-10T11:16:31",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-10T11:21:00",
       "value_in_mg_per_dl": 99.09909909909909,
       "trend": "STABLE",
       "source": "csv"
+    },
+    {
+      "timestamp": "2026-06-10T11:21:31",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
     },
     {
       "timestamp": "2026-06-10T11:26:00",
@@ -625525,10 +625567,22 @@
       "source": "csv"
     },
     {
+      "timestamp": "2026-06-10T11:26:31",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-10T11:31:00",
       "value_in_mg_per_dl": 100.9009009009009,
       "trend": "STABLE",
       "source": "csv"
+    },
+    {
+      "timestamp": "2026-06-10T11:31:31",
+      "value_in_mg_per_dl": 101.0,
+      "trend": "",
+      "source": "live"
     },
     {
       "timestamp": "2026-06-10T11:36:00",
@@ -625537,10 +625591,22 @@
       "source": "csv"
     },
     {
+      "timestamp": "2026-06-10T11:36:31",
+      "value_in_mg_per_dl": 101.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-10T11:41:00",
       "value_in_mg_per_dl": 100.9009009009009,
       "trend": "STABLE",
       "source": "csv"
+    },
+    {
+      "timestamp": "2026-06-10T11:41:31",
+      "value_in_mg_per_dl": 100.0,
+      "trend": "",
+      "source": "live"
     },
     {
       "timestamp": "2026-06-10T11:46:00",
@@ -625549,10 +625615,22 @@
       "source": "csv"
     },
     {
+      "timestamp": "2026-06-10T11:46:31",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-10T11:51:00",
       "value_in_mg_per_dl": 99.09909909909909,
       "trend": "STABLE",
       "source": "csv"
+    },
+    {
+      "timestamp": "2026-06-10T11:51:31",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
     },
     {
       "timestamp": "2026-06-10T11:56:00",
@@ -625561,10 +625639,22 @@
       "source": "csv"
     },
     {
+      "timestamp": "2026-06-10T11:56:31",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-10T12:01:00",
       "value_in_mg_per_dl": 97.2972972972973,
       "trend": "STABLE",
       "source": "csv"
+    },
+    {
+      "timestamp": "2026-06-10T12:01:31",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
     },
     {
       "timestamp": "2026-06-10T12:06:00",
@@ -625573,10 +625663,22 @@
       "source": "csv"
     },
     {
+      "timestamp": "2026-06-10T12:06:31",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-10T12:11:00",
       "value_in_mg_per_dl": 100.9009009009009,
       "trend": "STABLE",
       "source": "csv"
+    },
+    {
+      "timestamp": "2026-06-10T12:11:31",
+      "value_in_mg_per_dl": 100.0,
+      "trend": "",
+      "source": "live"
     },
     {
       "timestamp": "2026-06-10T12:16:00",
@@ -625585,18 +625687,54 @@
       "source": "csv"
     },
     {
+      "timestamp": "2026-06-10T12:16:31",
+      "value_in_mg_per_dl": 106.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-10T12:21:00",
       "value_in_mg_per_dl": 111.71171171171171,
       "trend": "STABLE",
       "source": "csv"
     },
     {
+      "timestamp": "2026-06-10T12:21:31",
+      "value_in_mg_per_dl": 111.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-10T12:26:00",
       "value_in_mg_per_dl": 117.11711711711712,
       "trend": "STABLE",
       "source": "csv"
+    },
+    {
+      "timestamp": "2026-06-10T12:26:31",
+      "value_in_mg_per_dl": 117.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-10T12:31:31",
+      "value_in_mg_per_dl": 126.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-10T12:36:31",
+      "value_in_mg_per_dl": 133.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-10T12:55:19",
+      "value_in_mg_per_dl": 165.0,
+      "trend": "UP_SLOW",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-06-10T12:51:13.914963-06:00",
-  "source": "merged"
+  "last_updated": "2026-06-10T12:55:39.533551-06:00",
+  "source": "live_api"
 }
