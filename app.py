@@ -1256,22 +1256,19 @@ with tab_chart:
                 if show_zoom_buttons and zoom_annotation:
                     annotations.append(zoom_annotation)
 
-                # Centered date label as a chart title annotation
-                title_font_size = 13 if show_zoom_buttons else 12
-                annotations.append(dict(
-                    text=f"<b>{day_label}</b>",
-                    x=0.5, y=1.0,
-                    xref="paper", yref="paper",
-                    showarrow=False,
-                    xanchor="center", yanchor="bottom",
-                    font=dict(size=title_font_size, color="#333"),
-                ))
-
                 right_margin = 60 if unit_choice == "Both" else 0
-                top_margin   = 42 if not show_zoom_buttons else 58
+                title_font_size = 13 if show_zoom_buttons else 12
+                top_margin   = 46 if not show_zoom_buttons else 62
                 fig.update_layout(
                     hovermode="x unified", height=chart_height, template="plotly_white",
                     margin=dict(l=0, r=right_margin, t=top_margin, b=35),
+                    title=dict(
+                        text=f"<b>{day_label}</b>",
+                        x=0.5, xanchor="center",
+                        y=1.0, yanchor="top",
+                        font=dict(size=title_font_size, color="#333", family="Arial, sans-serif"),
+                        pad=dict(t=4),
+                    ),
                     xaxis=xaxis_cfg,
                     annotations=annotations,
                     **layout_extra,
