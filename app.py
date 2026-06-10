@@ -965,14 +965,15 @@ with tab_chart:
 
         nav_col1, nav_col2, nav_col3, nav_col4, nav_col5, nav_col6 = st.columns([1.2, 1, 1, 1, 1, 2])
         with nav_col1:
-            _view_options = ["Day", "1 Week", "2 Weeks"]
-            _view_map     = {"day": 0, "week": 1, "2weeks": 2}
+            _view_options = ["Day", "1 Week", "2 Weeks", "Month", "Compare"]
+            _view_map     = {"day": 0, "week": 1, "2weeks": 2, "month": 3, "compare": 4}
             _view_idx     = _view_map.get(st.session_state.nav_view, 0)
             view_mode = st.radio("View", _view_options, horizontal=True,
                                   index=_view_idx, key="view_mode_radio")
-            st.session_state.nav_view = {"Day": "day", "1 Week": "week", "2 Weeks": "2weeks"}[view_mode]
+            st.session_state.nav_view = {"Day": "day", "1 Week": "week", "2 Weeks": "2weeks",
+                                         "Month": "month", "Compare": "compare"}[view_mode]
 
-        if st.session_state.nav_view == "day":
+        if st.session_state.nav_view in ("day", "compare"):
             min_offset = -(data_max_date - data_min_date).days
         else:
             min_offset = -((data_max_date - data_min_date).days // 7) * 7
@@ -988,7 +989,8 @@ with tab_chart:
                 st.rerun()
         with nav_col3:
             st.write("")
-            step = 1 if st.session_state.nav_view == "day" else (14 if st.session_state.nav_view == "2weeks" else 7)
+            _step_map = {"day": 1, "week": 7, "2weeks": 14, "month": 30, "compare": 1}
+            step = _step_map.get(st.session_state.nav_view, 1)
             if st.button("◄ Back", use_container_width=True):
                 st.session_state.nav_offset_days = max(min_offset, offset - step)
                 st.session_state.show_last_24h = False
@@ -1020,19 +1022,36 @@ with tab_chart:
             window_end   = datetime.combine(anchor_date, datetime.max.time())
             period_label = anchor_date.strftime("%A, %b %d %Y")
         else:
-            # Any week navigation clears the 24h mode
+            # Any multi-day navigation clears the 24h mode
             st.session_state.show_last_24h = False
-            week_start   = anchor_date - timedelta(days=anchor_date.weekday())
-            if st.session_state.nav_view == "2weeks":
-                week_end     = week_start + timedelta(days=13)
-                period_label = f"2 Weeks: {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
-                week_days    = [week_start + timedelta(days=i) for i in range(14)]
+            if st.session_state.nav_view == "month":
+                # Month: show the calendar month containing anchor_date
+                import calendar as _cal
+                month_start  = anchor_date.replace(day=1)
+                last_day     = _cal.monthrange(month_start.year, month_start.month)[1]
+                month_end    = month_start.replace(day=last_day)
+                period_label = month_start.strftime("%B %Y")
+                week_days    = [month_start + timedelta(days=i) for i in range(last_day)]
+                window_start = datetime.combine(month_start, datetime.min.time())
+                window_end   = datetime.combine(month_end,   datetime.max.time())
+            elif st.session_state.nav_view == "compare":
+                # Compare: window covers full data range; actual days chosen via UI below
+                period_label = "Day Comparison"
+                week_days    = []  # not used for compare
+                window_start = datetime.combine(data_min_date, datetime.min.time())
+                window_end   = datetime.combine(data_max_date, datetime.max.time())
             else:
-                week_end     = week_start + timedelta(days=6)
-                period_label = f"Week of {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
-                week_days    = [week_start + timedelta(days=i) for i in range(7)]
-            window_start = datetime.combine(week_start, datetime.min.time())
-            window_end   = datetime.combine(week_end,   datetime.max.time())
+                week_start   = anchor_date - timedelta(days=anchor_date.weekday())
+                if st.session_state.nav_view == "2weeks":
+                    week_end     = week_start + timedelta(days=13)
+                    period_label = f"2 Weeks: {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
+                    week_days    = [week_start + timedelta(days=i) for i in range(14)]
+                else:
+                    week_end     = week_start + timedelta(days=6)
+                    period_label = f"Week of {week_start.strftime('%b %d')} – {week_end.strftime('%b %d, %Y')}"
+                    week_days    = [week_start + timedelta(days=i) for i in range(7)]
+                window_start = datetime.combine(week_start, datetime.min.time())
+                window_end   = datetime.combine(week_end,   datetime.max.time())
 
         with nav_col6:
             st.markdown(
@@ -1040,52 +1059,56 @@ with tab_chart:
                 unsafe_allow_html=True
             )
 
-        # ── Calendar date picker (Day and Week view) ──────────────────────────
-        if available_dates:
+        # ── Calendar date picker (Day, Week, Month views) ────────────────────
+        if available_dates and st.session_state.nav_view != "compare":
             cal_col1, cal_col2 = st.columns([1, 3])
             with cal_col1:
-                if st.session_state.nav_view == "day":
-                    st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to date:</div>',
-                                unsafe_allow_html=True)
-                elif st.session_state.nav_view == "2weeks":
-                    st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to 2-week start:</div>',
-                                unsafe_allow_html=True)
-                else:
-                    st.markdown('<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">🗓️ Jump to week of:</div>',
-                                unsafe_allow_html=True)
+                _picker_labels = {
+                    "day": "🗓️ Jump to date:",
+                    "week": "🗓️ Jump to week of:",
+                    "2weeks": "🗓️ Jump to 2-week start:",
+                    "month": "🗓️ Jump to month:",
+                }
+                st.markdown(
+                    f'<div style="padding-top:6px;font-size:13px;font-weight:600;color:#555;">'
+                    f'{_picker_labels.get(st.session_state.nav_view, "🗓️ Jump to:")}</div>',
+                    unsafe_allow_html=True
+                )
             with cal_col2:
                 if st.session_state.nav_view == "day":
-                    # Day view: pick any date
                     picked = st.date_input(
-                        "jump_date",
-                        value=anchor_date,
-                        min_value=data_min_date,
-                        max_value=data_max_date,
-                        label_visibility="collapsed",
-                        key="cal_picker_day",
+                        "jump_date", value=anchor_date,
+                        min_value=data_min_date, max_value=data_max_date,
+                        label_visibility="collapsed", key="cal_picker_day",
                     )
                     if picked != anchor_date:
-                        new_offset = (picked - data_max_date).days
-                        st.session_state.nav_offset_days = max(min_offset, min(0, new_offset))
+                        st.session_state.nav_offset_days = max(min_offset, min(0, (picked - data_max_date).days))
+                        st.session_state.show_last_24h = False
+                        st.rerun()
+                elif st.session_state.nav_view == "month":
+                    # Month view: pick any date — snaps to 1st of that month
+                    picked_m = st.date_input(
+                        "jump_month", value=anchor_date,
+                        min_value=data_min_date, max_value=data_max_date,
+                        label_visibility="collapsed", key="cal_picker_month",
+                    )
+                    picked_month_1st = picked_m.replace(day=1)
+                    if picked_month_1st != anchor_date.replace(day=1):
+                        st.session_state.nav_offset_days = max(min_offset, min(0, (picked_month_1st - data_max_date).days))
                         st.session_state.show_last_24h = False
                         st.rerun()
                 else:
-                    # Week / 2-week view: pick any date — will snap to the Monday of that week
+                    # Week / 2-week view: snap to Monday of picked week
                     current_week_start = anchor_date - timedelta(days=anchor_date.weekday())
                     _wk_key = "cal_picker_2week" if st.session_state.nav_view == "2weeks" else "cal_picker_week"
                     picked_week = st.date_input(
-                        _wk_key,
-                        value=current_week_start,
-                        min_value=data_min_date,
-                        max_value=data_max_date,
-                        label_visibility="collapsed",
-                        key=_wk_key,
+                        _wk_key, value=current_week_start,
+                        min_value=data_min_date, max_value=data_max_date,
+                        label_visibility="collapsed", key=_wk_key,
                     )
-                    # Snap to Monday of the picked week
                     picked_week_monday = picked_week - timedelta(days=picked_week.weekday())
                     if picked_week_monday != current_week_start:
-                        new_offset = (picked_week_monday - data_max_date).days
-                        st.session_state.nav_offset_days = max(min_offset, min(0, new_offset))
+                        st.session_state.nav_offset_days = max(min_offset, min(0, (picked_week_monday - data_max_date).days))
                         st.session_state.show_last_24h = False
                         st.rerun()
 
@@ -1285,16 +1308,109 @@ with tab_chart:
                     f'📆 {date_str}</div>',
                     unsafe_allow_html=True
                 )
+                # Time-range slider replaces the old 3h/6h/12h/24h zoom buttons
+                _day_time_range = st.slider(
+                    "Time window",
+                    min_value=0, max_value=24, value=(0, 24), step=1,
+                    key="day_time_slider",
+                    help="Drag to zoom into a specific part of the day",
+                    format="%02d:00",
+                )
                 fig = build_day_chart(
                     chart_df, date_str, unit_choice,
                     target_low_mg, target_high_mg,
                     target_low_mmol, target_high_mmol,
-                    show_zoom_buttons=True
+                    show_zoom_buttons=False,
+                    x_range_hours=_day_time_range,
                 )
                 if fig:
                     st.plotly_chart(fig, use_container_width=True)
 
-            # ── Week View: one chart per day ──────────────────────────────────
+            # ── Compare View: pick 2–3 independent days side-by-side ─────────────
+            elif st.session_state.nav_view == "compare":
+                st.markdown("**Select 2 or 3 days to compare side-by-side:**")
+                _cmp_picker_cols = st.columns(3)
+                _cmp_days = []
+                _cmp_defaults = st.session_state.compare_days
+                for _ci in range(3):
+                    with _cmp_picker_cols[_ci]:
+                        _default_val = None
+                        if _ci < len(_cmp_defaults):
+                            try:
+                                from datetime import date as _date_cls
+                                _dv = _date_cls.fromisoformat(_cmp_defaults[_ci])
+                                if data_min_date <= _dv <= data_max_date:
+                                    _default_val = _dv
+                            except Exception:
+                                pass
+                        if _default_val is None:
+                            _default_val = data_max_date - timedelta(days=_ci)
+                        _label = f"Day {_ci + 1}" if _ci < 2 else "Day 3 (optional)"
+                        _picked_cmp = st.date_input(
+                            _label, value=_default_val,
+                            min_value=data_min_date, max_value=data_max_date,
+                            key=f"cmp_day_{_ci}",
+                        )
+                        _cmp_days.append(_picked_cmp)
+                st.session_state.compare_days = [str(d) for d in _cmp_days]
+
+                _cmp_time_range = st.slider(
+                    "Time window",
+                    min_value=0, max_value=24, value=(0, 24), step=1,
+                    key="cmp_time_slider",
+                    help="Show the same time window across all compared days",
+                    format="%02d:00",
+                )
+
+                # Shared y-range across selected days
+                _cmp_all_dfs = []
+                for _cd in _cmp_days:
+                    _cd_df = wide_df[
+                        (wide_df["Timestamp"] >= datetime.combine(_cd, datetime.min.time())) &
+                        (wide_df["Timestamp"] <= datetime.combine(_cd, datetime.max.time()))
+                    ]
+                    if not _cd_df.empty:
+                        _cmp_all_dfs.append(_cd_df)
+                if _cmp_all_dfs:
+                    import pandas as _pd
+                    _cmp_combined = _pd.concat(_cmp_all_dfs)
+                    _cmp_shared_y = centered_yrange_mg(
+                        target_low_mg, target_high_mg,
+                        _cmp_combined["Glucose_mg"].min(),
+                        _cmp_combined["Glucose_mg"].max()
+                    )
+                else:
+                    _cmp_shared_y = None
+
+                _cmp_render_cols = st.columns(3)
+                for _ci, _cd in enumerate(_cmp_days):
+                    _cd_df = wide_df[
+                        (wide_df["Timestamp"] >= datetime.combine(_cd, datetime.min.time())) &
+                        (wide_df["Timestamp"] <= datetime.combine(_cd, datetime.max.time()))
+                    ].copy()
+                    _cd_label = _cd.strftime("%A, %b %d %Y")
+                    with _cmp_render_cols[_ci]:
+                        if _cd_df.empty:
+                            st.markdown(
+                                f'<div style="font-size:12px;color:#999;padding:40px 0;'
+                                f'text-align:center;border:1px dashed #ddd;border-radius:6px;">'
+                                f'{_cd_label}<br><em>no data</em></div>',
+                                unsafe_allow_html=True
+                            )
+                        else:
+                            fig = build_day_chart(
+                                _cd_df, _cd_label, unit_choice,
+                                target_low_mg, target_high_mg,
+                                target_low_mmol, target_high_mmol,
+                                show_zoom_buttons=False,
+                                chart_height=340,
+                                x_range_hours=_cmp_time_range,
+                                forced_y_range_mg=_cmp_shared_y,
+                            )
+                            if fig:
+                                st.plotly_chart(fig, use_container_width=True)
+
+            # ── Week / 2-Week / Month View: grid of day charts ──────────────────
             else:
                 # ── Controls row: columns + time-range slider ─────────────────────
                 _wv_ctrl1, _wv_ctrl2, _wv_ctrl3 = st.columns([0.8, 2.5, 2])
