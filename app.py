@@ -1314,14 +1314,21 @@ with tab_chart:
                     f'📆 {date_str}</div>',
                     unsafe_allow_html=True
                 )
-                # Time-range slider replaces the old 3h/6h/12h/24h zoom buttons
+                # Time-range slider — dynamic key resets to 00-24 when switching days
                 _day_time_range = st.slider(
                     "Time window",
                     min_value=0, max_value=24, value=(0, 24), step=1,
-                    key="day_time_slider",
+                    key=f"day_time_slider_{anchor_date.isoformat()}",
                     help="Drag to zoom into a specific part of the day",
                     format="%02d:00",
                 )
+                # If user drags slider away from full range, exit Last 24h mode
+                # so the chart shows the selected day's data (not a rolling 24h window)
+                if _day_time_range != (0, 24) and st.session_state.show_last_24h:
+                    st.session_state.show_last_24h = False
+                    st.rerun()
+                # In Last 24h mode, chart_df already spans Jun 9 → Jun 10;
+                # pass the slider range so the user can still zoom within that window
                 fig = build_day_chart(
                     chart_df, date_str, unit_choice,
                     target_low_mg, target_high_mg,
