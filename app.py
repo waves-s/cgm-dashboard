@@ -1236,17 +1236,15 @@ with tab_chart:
                 if show_zoom_buttons and rangeselector_cfg:
                     xaxis_cfg["rangeselector"] = rangeselector_cfg
 
-                # Apply 12h or 24h x-axis window
-                if x_range_hours in ("am", "pm") and not day_df.empty:
-                    day_date = day_df["Timestamp"].dt.date.iloc[0]
-                    midday   = datetime.combine(day_date, datetime.min.time()) + timedelta(hours=12)
-                    if x_range_hours == "am":
-                        x_start = datetime.combine(day_date, datetime.min.time())
-                        x_end   = midday
-                    else:  # pm
-                        x_start = midday
-                        x_end   = datetime.combine(day_date, datetime.max.time())
-                    xaxis_cfg["range"] = [x_start, x_end]
+                # Apply time-range window to x-axis
+                # x_range_hours is either 24 (full day) or a (start_h, end_h) tuple
+                if isinstance(x_range_hours, tuple) and not day_df.empty:
+                    start_h, end_h = x_range_hours
+                    if start_h != 0 or end_h != 24:  # only restrict if not full day
+                        day_date = day_df["Timestamp"].dt.date.iloc[0]
+                        x_start  = datetime.combine(day_date, datetime.min.time()) + timedelta(hours=start_h)
+                        x_end    = datetime.combine(day_date, datetime.min.time()) + timedelta(hours=end_h)
+                        xaxis_cfg["range"] = [x_start, x_end]
 
                 annotations = []
                 if show_zoom_buttons and zoom_annotation:
@@ -1285,8 +1283,8 @@ with tab_chart:
 
             # ── Week View: one chart per day ──────────────────────────────────
             else:
-                # ── Controls row: columns + cycle ─────────────────────────────
-                _wv_ctrl1, _wv_ctrl2, _wv_ctrl3 = st.columns([1.2, 1.2, 3])
+                # ── Controls row: columns + time-range slider ─────────────────────
+                _wv_ctrl1, _wv_ctrl2, _wv_ctrl3 = st.columns([0.8, 2.5, 2])
                 with _wv_ctrl1:
                     _n_cols = st.radio(
                         "Columns", [2, 3], index=1, horizontal=True,
@@ -1294,12 +1292,16 @@ with tab_chart:
                         help="Number of day charts per row"
                     )
                 with _wv_ctrl2:
-                    _cycle_h = st.radio(
-                        "Cycle", ["24h", "AM (00–12)", "PM (12–00)"], index=0, horizontal=True,
-                        key="week_cycle_hrs",
-                        help="24h = full day | AM = midnight to noon | PM = noon to midnight"
+                    _time_range = st.slider(
+                        "Time window (hours)",
+                        min_value=0, max_value=24,
+                        value=(0, 24),
+                        step=1,
+                        key="week_time_slider",
+                        help="Drag to select which hours of the day to show across all charts",
+                        format="%02d:00",
                     )
-                    _x_hrs = 24 if _cycle_h == "24h" else ("am" if "AM" in _cycle_h else "pm")
+                    _x_hrs = _time_range  # tuple (start_h, end_h)
                 with _wv_ctrl3:
                     st.markdown(
                         f'<div style="padding-top:8px;font-size:13px;font-weight:600;'
