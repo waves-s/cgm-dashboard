@@ -378,17 +378,16 @@ def pull_cache_from_github() -> bool:
 
 def commit_cache_to_github(df: pd.DataFrame) -> tuple[bool, str]:
     """
-    Serialise df to cache.json format and commit it directly to the GitHub repo
-    via the GitHub Contents API.  Requires a GH_PAT secret in Streamlit secrets
-    with repo write access.
+    Serialise df to cache.json and commit it directly to the GitHub repo.
+    Uses the Git Data API (blob + tree + commit) which has no file-size limit,
+    unlike the Contents API which fails silently for files over ~1 MB.
 
     Returns (success: bool, message: str).
     """
     try:
-        # Read token from Streamlit secrets
         gh_token = st.secrets.get("github", {}).get("pat") or st.secrets.get("GH_PAT", "")
         if not gh_token:
-            return False, "GitHub token not found in secrets. Add [github] pat = '...' to Streamlit secrets."
+            return False, "GitHub token not found in secrets."
 
         # Build the JSON payload
         readings = []
@@ -405,34 +404,88 @@ def commit_cache_to_github(df: pd.DataFrame) -> tuple[bool, str]:
             "source": "merged",
         }
         content_str = json.dumps(data, indent=2)
-        content_b64 = base64.b64encode(content_str.encode()).decode()
 
         headers = {
             "Authorization": f"token {gh_token}",
             "Accept": "application/vnd.github+json",
             "X-GitHub-Api-Version": "2022-11-28",
         }
-        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{GITHUB_PATH}"
+        base_url = f"https://api.github.com/repos/{GITHUB_REPO}"
 
-        # Get the current file SHA (needed to update an existing file)
-        get_resp = requests.get(api_url, headers=headers, params={"ref": GITHUB_BRANCH}, timeout=15)
-        sha = get_resp.json().get("sha") if get_resp.status_code == 200 else None
+        # Step 1: Create a blob with the new file content
+        blob_resp = requests.post(
+            f"{base_url}/git/blobs",
+            headers=headers,
+            json={"content": content_str, "encoding": "utf-8"},
+            timeout=60,
+        )
+        if blob_resp.status_code != 201:
+            return False, f"Blob creation failed: {blob_resp.json().get('message', blob_resp.text[:200])}"
+        blob_sha = blob_resp.json()["sha"]
 
-        # Commit the new content
-        payload = {
-            "message": f"seed: upload {len(readings):,} historical readings via dashboard",
-            "content": content_b64,
-            "branch": GITHUB_BRANCH,
-        }
-        if sha:
-            payload["sha"] = sha  # required when updating an existing file
+        # Step 2: Get the current HEAD commit SHA for the branch
+        ref_resp = requests.get(
+            f"{base_url}/git/refs/heads/{GITHUB_BRANCH}",
+            headers=headers, timeout=15,
+        )
+        if ref_resp.status_code != 200:
+            return False, f"Could not get branch ref: {ref_resp.json().get('message', '')}"
+        head_sha = ref_resp.json()["object"]["sha"]
 
-        put_resp = requests.put(api_url, headers=headers, json=payload, timeout=30)
-        if put_resp.status_code in (200, 201):
-            return True, f"✅ {len(readings):,} readings committed to GitHub repo — visible to everyone worldwide."
-        else:
-            detail = put_resp.json().get("message", put_resp.text[:200])
-            return False, f"GitHub API error {put_resp.status_code}: {detail}"
+        # Step 3: Get the tree SHA of the current HEAD commit
+        commit_resp = requests.get(
+            f"{base_url}/git/commits/{head_sha}",
+            headers=headers, timeout=15,
+        )
+        if commit_resp.status_code != 200:
+            return False, f"Could not get commit: {commit_resp.json().get('message', '')}"
+        base_tree_sha = commit_resp.json()["tree"]["sha"]
+
+        # Step 4: Create a new tree that updates only cache.json
+        tree_resp = requests.post(
+            f"{base_url}/git/trees",
+            headers=headers,
+            json={
+                "base_tree": base_tree_sha,
+                "tree": [{
+                    "path": GITHUB_PATH,
+                    "mode": "100644",
+                    "type": "blob",
+                    "sha": blob_sha,
+                }],
+            },
+            timeout=30,
+        )
+        if tree_resp.status_code != 201:
+            return False, f"Tree creation failed: {tree_resp.json().get('message', tree_resp.text[:200])}"
+        new_tree_sha = tree_resp.json()["sha"]
+
+        # Step 5: Create a new commit
+        new_commit_resp = requests.post(
+            f"{base_url}/git/commits",
+            headers=headers,
+            json={
+                "message": f"data: merge {len(readings):,} readings via dashboard upload [skip poll]",
+                "tree": new_tree_sha,
+                "parents": [head_sha],
+            },
+            timeout=30,
+        )
+        if new_commit_resp.status_code != 201:
+            return False, f"Commit creation failed: {new_commit_resp.json().get('message', new_commit_resp.text[:200])}"
+        new_commit_sha = new_commit_resp.json()["sha"]
+
+        # Step 6: Update the branch ref to point to the new commit
+        update_resp = requests.patch(
+            f"{base_url}/git/refs/heads/{GITHUB_BRANCH}",
+            headers=headers,
+            json={"sha": new_commit_sha},
+            timeout=15,
+        )
+        if update_resp.status_code != 200:
+            return False, f"Ref update failed: {update_resp.json().get('message', update_resp.text[:200])}"
+
+        return True, f"✅ {len(readings):,} readings committed to GitHub — visible to all users worldwide."
 
     except Exception as e:
         return False, f"Commit failed: {e}"
@@ -625,73 +678,108 @@ def merge_renpho(existing: pd.DataFrame, new_df: pd.DataFrame) -> pd.DataFrame:
     return combined
 
 
-def parse_libreview_csv(uploaded_file) -> pd.DataFrame:
+def parse_libreview_csv(uploaded_file) -> tuple[pd.DataFrame, str]:
     """
-    Parse a LibreView CSV export file.
-    LibreView CSV has metadata rows at the top; glucose data starts after the header row
-    containing 'Device Timestamp'.
+    Parse a CGM CSV export file.
+    Supports:
+      - FreeStyle Libre / LibreView exports (header row contains 'Device Timestamp')
+      - Dexcom Clarity exports (header row contains 'Timestamp (YYYY-MM-DDThh:mm:ss)')
+    Always merges into existing cache — never replaces it.
     """
     try:
         content = uploaded_file.read().decode("utf-8", errors="replace")
         lines = content.splitlines()
 
-        # Find the header row (contains 'Device Timestamp')
-        header_idx = None
-        for i, line in enumerate(lines):
-            if "Device Timestamp" in line or "device timestamp" in line.lower():
-                header_idx = i
-                break
+        # ── Detect format ──────────────────────────────────────────────────────
+        is_dexcom = any("Timestamp (YYYY-MM-DDThh:mm:ss)" in line or
+                        "Glucose Value (mg/dL)" in line for line in lines[:10])
 
-        if header_idx is None:
-            return pd.DataFrame(), "Could not find 'Device Timestamp' column in CSV. Please use a LibreView export file."
+        if is_dexcom:
+            # ── Dexcom Clarity format ──────────────────────────────────────────
+            # Header row is row 0 (no metadata rows)
+            df = pd.read_csv(io.StringIO(content))
+            df.columns = [c.strip() for c in df.columns]
 
-        # Parse from the header row onwards
-        csv_content = "\n".join(lines[header_idx:])
-        df = pd.read_csv(io.StringIO(csv_content))
+            ts_col = next((c for c in df.columns if c.startswith("Timestamp")), None)
+            mg_col = next((c for c in df.columns if "Glucose Value (mg/dL)" in c), None)
 
-        # Normalise column names
-        df.columns = [c.strip() for c in df.columns]
+            if ts_col is None or mg_col is None:
+                return pd.DataFrame(), (
+                    f"Dexcom Clarity CSV: could not find required columns. "
+                    f"Found: {list(df.columns)}"
+                )
 
-        # Find timestamp column
-        ts_col = next((c for c in df.columns if "timestamp" in c.lower()), None)
-        if ts_col is None:
-            return pd.DataFrame(), "Could not find timestamp column."
+            # Keep only EGV rows (Event Type == 'EGV')
+            if "Event Type" in df.columns:
+                df = df[df["Event Type"].astype(str).str.strip() == "EGV"].copy()
 
-        # Find glucose value column — LibreView uses 'Historic Glucose mg/dL' or 'Historic Glucose mmol/L'
-        # or 'Scan Glucose mg/dL' / 'Scan Glucose mmol/L'
-        glucose_col_mg   = next((c for c in df.columns if "historic glucose mg" in c.lower() or "scan glucose mg" in c.lower()), None)
-        glucose_col_mmol = next((c for c in df.columns if "historic glucose mmol" in c.lower() or "scan glucose mmol" in c.lower()), None)
+            result = pd.DataFrame()
+            result["Timestamp"] = pd.to_datetime(df[ts_col], errors="coerce")
+            # Dexcom timestamps are already in local time (no tz conversion needed)
+            result["Timestamp"] = result["Timestamp"].dt.tz_localize(None)
+            result = result.dropna(subset=["Timestamp"])
 
-        if glucose_col_mg is None and glucose_col_mmol is None:
-            # Try generic fallback
-            glucose_col_mg = next((c for c in df.columns if "glucose" in c.lower() and "mg" in c.lower()), None)
-            glucose_col_mmol = next((c for c in df.columns if "glucose" in c.lower() and "mmol" in c.lower()), None)
+            # Handle 'Low' / 'High' text values
+            raw_mg = df[mg_col].astype(str).str.strip()
+            result["Glucose_mg"] = raw_mg.replace({"Low": "40", "High": "400"}).pipe(pd.to_numeric, errors="coerce")
+            result = result.dropna(subset=["Glucose_mg"])
+            result["source"] = "dexcom_csv"
 
-        if glucose_col_mg is None and glucose_col_mmol is None:
-            return pd.DataFrame(), f"Could not find glucose column. Available columns: {list(df.columns)}"
-
-        # Build result DataFrame
-        result = pd.DataFrame()
-        # CONFIRMED: LibreView CSV timestamps are already in the device/account local time
-        # (Calgary Mountain Time). Parse as naive datetimes — no timezone conversion needed.
-        # dayfirst=True handles the DD-MM-YYYY format used by LibreView.
-        result["Timestamp"] = pd.to_datetime(df[ts_col], errors="coerce", dayfirst=True)
-        result = result.dropna(subset=["Timestamp"])
-
-        if glucose_col_mg:
-            result["Glucose_mg"] = pd.to_numeric(df[glucose_col_mg], errors="coerce")
         else:
-            # Convert mmol/L to mg/dL
-            result["Glucose_mg"] = pd.to_numeric(df[glucose_col_mmol], errors="coerce") / MG_TO_MMOL
+            # ── FreeStyle Libre / LibreView format ────────────────────────────
+            header_idx = None
+            for i, line in enumerate(lines):
+                if "Device Timestamp" in line or "device timestamp" in line.lower():
+                    header_idx = i
+                    break
 
-        result = result.dropna(subset=["Glucose_mg"])
+            if header_idx is None:
+                return pd.DataFrame(), (
+                    "Could not recognise CSV format. "
+                    "Please use a LibreView (FreeStyle Libre) or Dexcom Clarity export file."
+                )
+
+            csv_content = "\n".join(lines[header_idx:])
+            df = pd.read_csv(io.StringIO(csv_content))
+            df.columns = [c.strip() for c in df.columns]
+
+            ts_col = next((c for c in df.columns if "timestamp" in c.lower()), None)
+            if ts_col is None:
+                return pd.DataFrame(), "Could not find timestamp column."
+
+            glucose_col_mg   = next((c for c in df.columns if "historic glucose mg" in c.lower() or "scan glucose mg" in c.lower()), None)
+            glucose_col_mmol = next((c for c in df.columns if "historic glucose mmol" in c.lower() or "scan glucose mmol" in c.lower()), None)
+
+            if glucose_col_mg is None and glucose_col_mmol is None:
+                glucose_col_mg   = next((c for c in df.columns if "glucose" in c.lower() and "mg" in c.lower()), None)
+                glucose_col_mmol = next((c for c in df.columns if "glucose" in c.lower() and "mmol" in c.lower()), None)
+
+            if glucose_col_mg is None and glucose_col_mmol is None:
+                return pd.DataFrame(), f"Could not find glucose column. Available columns: {list(df.columns)}"
+
+            result = pd.DataFrame()
+            # LibreView timestamps are in local Calgary time; dayfirst=True for DD-MM-YYYY
+            result["Timestamp"] = pd.to_datetime(df[ts_col], errors="coerce", dayfirst=True)
+            result = result.dropna(subset=["Timestamp"])
+
+            if glucose_col_mg:
+                result["Glucose_mg"] = pd.to_numeric(df[glucose_col_mg], errors="coerce")
+            else:
+                result["Glucose_mg"] = pd.to_numeric(df[glucose_col_mmol], errors="coerce") / MG_TO_MMOL
+
+            result = result.dropna(subset=["Glucose_mg"])
+            result["source"] = "csv"
+
+        # ── Common post-processing ─────────────────────────────────────────────
         result["Glucose_mmol"] = (result["Glucose_mg"] * MG_TO_MMOL).round(1)
         result["Is High"] = False
         result["Is Low"]  = False
-        result["source"]  = "csv"
         result["trend"]   = "STABLE"
 
-        return result.drop_duplicates("Timestamp").sort_values("Timestamp").reset_index(drop=True), None
+        result = result.drop_duplicates("Timestamp").sort_values("Timestamp").reset_index(drop=True)
+        if result.empty:
+            return pd.DataFrame(), "No valid glucose readings found in CSV."
+        return result, None
 
     except Exception as e:
         return pd.DataFrame(), f"Error parsing CSV: {e}"
