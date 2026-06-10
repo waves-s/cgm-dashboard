@@ -156,6 +156,7 @@ for key, default in {
     "renpho_weight_unit": "lb",         # Weight display unit: 'lb' or 'kg'
     "renpho_date_range_days": 0,        # 0 = all time; otherwise number of days
     "renpho_upload_done": False,        # Flag to suppress rerun loop after upload
+    "compare_days": [],                  # List of date strings for Day Comparison mode
 }.items():
     if key not in st.session_state:
         st.session_state[key] = default
@@ -1113,15 +1114,20 @@ with tab_chart:
                                 target_low_mmol, target_high_mmol,
                                 show_zoom_buttons=True,
                                 chart_height=420,
-                                x_range_hours=24):
+                                x_range_hours=24,
+                                forced_y_range_mg=None):
                 """Build a single-day Plotly figure with target bands and midnight dotted lines."""
-                # x_range_hours: 24 = full day, 12 = first half (00:00-12:00) or second half based on data
+                # x_range_hours: 24 = full day, or (start_h, end_h) tuple
+                # forced_y_range_mg: if provided, use this (y_min_mg, y_max_mg) instead of per-day auto-range
                 if day_df.empty:
                     return None
 
                 data_min_mg = day_df["Glucose_mg"].min()
                 data_max_mg = day_df["Glucose_mg"].max()
-                y_min_mg, y_max_mg = centered_yrange_mg(target_low_mg, target_high_mg, data_min_mg, data_max_mg)
+                if forced_y_range_mg is not None:
+                    y_min_mg, y_max_mg = forced_y_range_mg
+                else:
+                    y_min_mg, y_max_mg = centered_yrange_mg(target_low_mg, target_high_mg, data_min_mg, data_max_mg)
                 y_min_mmol = round(y_min_mg * MG_TO_MMOL, 1)
                 y_max_mmol = round(y_max_mg * MG_TO_MMOL, 1)
 
@@ -1250,9 +1256,19 @@ with tab_chart:
                 if show_zoom_buttons and zoom_annotation:
                     annotations.append(zoom_annotation)
 
-                # t=55 gives room for zoom buttons (rangeselector) without overlapping date label
+                # Centered date label as a chart title annotation
+                title_font_size = 13 if show_zoom_buttons else 12
+                annotations.append(dict(
+                    text=f"<b>{day_label}</b>",
+                    x=0.5, y=1.0,
+                    xref="paper", yref="paper",
+                    showarrow=False,
+                    xanchor="center", yanchor="bottom",
+                    font=dict(size=title_font_size, color="#333"),
+                ))
+
                 right_margin = 60 if unit_choice == "Both" else 0
-                top_margin   = 40 if not show_zoom_buttons else 55
+                top_margin   = 42 if not show_zoom_buttons else 58
                 fig.update_layout(
                     hovermode="x unified", height=chart_height, template="plotly_white",
                     margin=dict(l=0, r=right_margin, t=top_margin, b=35),
@@ -1314,6 +1330,27 @@ with tab_chart:
                 # Chart height shrinks with more columns so they fit nicely
                 _grid_height = 255 if _n_cols == 3 else 295
 
+                # ── Pre-compute shared Y-range across all days in the period ──────────────
+                # Filter chart_df to the selected time window for a fair shared range
+                if isinstance(_x_hrs, tuple) and (_x_hrs[0] != 0 or _x_hrs[1] != 24):
+                    _sh, _eh = _x_hrs
+                    _windowed = chart_df[
+                        chart_df["Timestamp"].apply(
+                            lambda ts: _sh <= ts.hour < _eh or (_eh == 24 and ts.hour >= _sh)
+                        )
+                    ]
+                else:
+                    _windowed = chart_df
+
+                if not _windowed.empty:
+                    _global_min_mg = _windowed["Glucose_mg"].min()
+                    _global_max_mg = _windowed["Glucose_mg"].max()
+                    _shared_y_mg   = centered_yrange_mg(
+                        target_low_mg, target_high_mg, _global_min_mg, _global_max_mg
+                    )
+                else:
+                    _shared_y_mg = None
+
                 # Render days in a responsive grid
                 _cols_iter = None
                 for _i, day in enumerate(week_days):
@@ -1338,11 +1375,6 @@ with tab_chart:
                                 unsafe_allow_html=True
                             )
                         else:
-                            st.markdown(
-                                f'<div style="font-size:12px;font-weight:700;color:#333;'
-                                f'margin-bottom:2px;">{day_label_str}</div>',
-                                unsafe_allow_html=True
-                            )
                             fig = build_day_chart(
                                 day_df, day_label_str, unit_choice,
                                 target_low_mg, target_high_mg,
@@ -1350,6 +1382,7 @@ with tab_chart:
                                 show_zoom_buttons=False,
                                 chart_height=_grid_height,
                                 x_range_hours=_x_hrs,
+                                forced_y_range_mg=_shared_y_mg,
                             )
                             if fig:
                                 st.plotly_chart(fig, use_container_width=True)
