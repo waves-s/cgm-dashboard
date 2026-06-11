@@ -956,11 +956,12 @@ if st.session_state.authenticated and st.session_state.selected_patient:
             # Rerun so the chart renders with the freshly fetched graph_data
             st.rerun()
     else:
-        # Re-fetch on every page load, throttled to once every 60s
+        # Re-fetch silently in the background, throttled to once every 60s.
+        # Do NOT call st.rerun() here — the auto-refresh fragment handles reruns
+        # when new data actually arrives, preventing an infinite rerun loop.
         elapsed = (datetime.now(CALGARY_TZ) - st.session_state.last_update).total_seconds()
         if elapsed >= 60 and _rate_ok:
             fetch_data(st.session_state.selected_patient)
-            st.rerun()
 
 # ─── Main Content ─────────────────────────────────────────────────────────────
 st.markdown(
@@ -2051,17 +2052,17 @@ def _auto_refresh_fragment():
     # Pull the latest cache from GitHub — only rerun if new data arrived
     _cache_updated = pull_cache_from_github()
 
-    # Also try to fetch live data from LibreView API if authenticated
+    # Also try to fetch live data from LibreView API if authenticated.
+    # Only rerun if the cache was updated — live fetch updates session state
+    # silently; the next natural render cycle will pick it up.
     _now = datetime.now(CALGARY_TZ).timestamp()
     _ok  = _now >= st.session_state.get("rate_limit_until", 0)
-    _live_updated = False
     if st.session_state.authenticated and st.session_state.selected_patient and _ok:
         fetch_data(st.session_state.selected_patient)
-        _live_updated = True
 
-    # Only trigger a full-page rerun if data actually changed
-    # This prevents the constant rerun loop when there is no new data
-    if _cache_updated or _live_updated:
+    # Only trigger a full-page rerun when the GitHub cache actually had new data.
+    # This prevents the constant rerun loop when there is no new data.
+    if _cache_updated:
         st.rerun()
 
 _auto_refresh_fragment()
