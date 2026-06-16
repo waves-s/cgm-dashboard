@@ -633943,12 +633943,24 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-06-15T19:57:31",
+      "value_in_mg_per_dl": 88.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-15T20:11:30",
       "value_in_mg_per_dl": 90.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-06-15T20:15:31",
+      "value_in_mg_per_dl": 92.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-06-15T20:13:14.799853-06:00",
+  "last_updated": "2026-06-15T20:17:39.680196-06:00",
   "source": "live_api"
 }
