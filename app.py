@@ -154,7 +154,7 @@ for key, default in {
     "renpho_df": None,                 # Cached Renpho DataFrame
     "renpho_selected_metrics": None,   # Selected metrics for Renpho chart
     "renpho_weight_unit": "lb",         # Weight display unit: 'lb' or 'kg'
-    "renpho_date_range_days": 0,        # 0 = all time; otherwise number of days
+    "renpho_date_range_days": -1,       # default: Since May 18 (Onyx Plan); 0 = all time
     "renpho_upload_done": False,        # Flag to suppress rerun loop after upload
     "compare_days": [],                  # List of date strings for Day Comparison mode
 }.items():
@@ -1799,13 +1799,18 @@ with tab_renpho:
 
         with ctrl3:
             # Fix 1: dynamic date range — styled label to make it obvious it's interactive
-            range_options = {"All time": 0, "1 week": 7, "2 weeks": 14, "1 month": 30, "2 months": 60,
-                             "3 months": 90, "6 months": 180, "1 year": 365}
+            ONYX_START = pd.Timestamp("2026-05-15")  # Beginning of Onyx Plan
+            range_options = {
+                "Since May 15 (Onyx Plan)": -1,  # special sentinel: filter by fixed date
+                "All time": 0,
+                "1 week": 7, "2 weeks": 14, "1 month": 30, "2 months": 60,
+                "3 months": 90, "6 months": 180, "1 year": 365,
+            }
             st.markdown("**📅 Select Date Range**")
             range_label = st.selectbox(
                 "Filter by date range:",
                 list(range_options.keys()),
-                index=0,
+                index=0,  # default: Since May 18 (Onyx Plan)
                 key="renpho_range_sel",
                 label_visibility="collapsed",
                 help="Filter charts to show only measurements within this time window",
@@ -1816,7 +1821,10 @@ with tab_renpho:
         # ── Date filter ──────────────────────────────────────────────────────────
         plot_df = _convert_weight(renpho_df, w_unit)
         now_dt  = datetime.now(CALGARY_TZ).replace(tzinfo=None)
-        if range_days > 0:
+        if range_days == -1:
+            # Fixed start date: Since May 18 (Onyx Plan)
+            plot_df = plot_df[plot_df["Timestamp"] >= ONYX_START]
+        elif range_days > 0:
             plot_df = plot_df[plot_df["Timestamp"] >= now_dt - pd.Timedelta(days=range_days)]
 
         # Dynamic unit labels after conversion
