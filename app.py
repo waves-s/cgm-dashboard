@@ -1912,17 +1912,6 @@ with tab_renpho:
                         customdata=delta_labels,
                         hovertemplate="%{x|%b %d, %Y}<br><b>%{customdata}</b><extra></extra>",
                     ))
-                    # Trend line (7-pt rolling avg) — orange dotted, same as other charts
-                    if len(col_data) >= 7:
-                        col_data["delta_roll"] = col_data["Delta"].rolling(7, center=True, min_periods=3).mean()
-                        fig.add_trace(go.Scatter(
-                            x=col_data["Timestamp"],
-                            y=col_data["delta_roll"],
-                            mode="lines",
-                            name="Trend (7-pt avg)",
-                            line=dict(color=TREND_ORANGE, width=2, dash="dot"),
-                            hoverinfo="skip",
-                        ))
                     # Annotation at the latest point
                     fig.add_annotation(
                         x=col_data["Timestamp"].iloc[-1],
@@ -1960,17 +1949,6 @@ with tab_renpho:
                     marker=dict(size=5),
                     hovertemplate=f"%{{x|%b %d, %Y}}<br>{label}: %{{y:.1f}} {unit}<extra></extra>",
                 ))
-                if len(col_data) >= 7:
-                    col_data = col_data.copy()
-                    col_data["rolling"] = col_data[metric].rolling(7, center=True, min_periods=3).mean()
-                    fig.add_trace(go.Scatter(
-                        x=col_data["Timestamp"],
-                        y=col_data["rolling"],
-                        mode="lines",
-                        name="Trend (7-pt avg)",
-                        line=dict(color="#e65c00", width=2, dash="dot"),
-                        hoverinfo="skip",
-                    ))
                 fig.update_layout(
                     yaxis_title=y_label,
                     height=260,
