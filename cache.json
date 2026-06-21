@@ -642685,12 +642685,180 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-06-20T19:21:34",
+      "value_in_mg_per_dl": 104.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T19:26:34",
+      "value_in_mg_per_dl": 105.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T19:31:33",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T19:36:44",
+      "value_in_mg_per_dl": 111.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-20T19:37:33",
       "value_in_mg_per_dl": 117.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T19:41:34",
+      "value_in_mg_per_dl": 112.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T19:46:33",
+      "value_in_mg_per_dl": 112.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T19:51:34",
+      "value_in_mg_per_dl": 111.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T19:56:34",
+      "value_in_mg_per_dl": 109.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:01:34",
+      "value_in_mg_per_dl": 110.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:06:32",
+      "value_in_mg_per_dl": 115.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:11:42",
+      "value_in_mg_per_dl": 122.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:16:45",
+      "value_in_mg_per_dl": 129.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:21:44",
+      "value_in_mg_per_dl": 139.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:26:34",
+      "value_in_mg_per_dl": 146.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:31:33",
+      "value_in_mg_per_dl": 147.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:36:33",
+      "value_in_mg_per_dl": 146.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:41:33",
+      "value_in_mg_per_dl": 144.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:46:33",
+      "value_in_mg_per_dl": 143.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:51:33",
+      "value_in_mg_per_dl": 137.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T20:56:33",
+      "value_in_mg_per_dl": 133.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T21:01:33",
+      "value_in_mg_per_dl": 128.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T21:06:34",
+      "value_in_mg_per_dl": 125.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T21:11:34",
+      "value_in_mg_per_dl": 124.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T21:16:32",
+      "value_in_mg_per_dl": 121.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T21:21:34",
+      "value_in_mg_per_dl": 120.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T21:26:33",
+      "value_in_mg_per_dl": 120.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T21:31:34",
+      "value_in_mg_per_dl": 120.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-20T21:52:33",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-06-20T19:41:23.812423-06:00",
+  "last_updated": "2026-06-21T00:30:59.896079-06:00",
   "source": "live_api"
 }
