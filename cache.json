@@ -654469,12 +654469,36 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-06-27T11:31:25",
+      "value_in_mg_per_dl": 88.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-27T11:36:25",
+      "value_in_mg_per_dl": 91.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-06-27T11:41:24",
+      "value_in_mg_per_dl": 94.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-27T11:44:24",
       "value_in_mg_per_dl": 95.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-06-27T11:58:25",
+      "value_in_mg_per_dl": 93.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-06-27T11:44:59.548017-06:00",
+  "last_updated": "2026-06-27T12:51:52.166403-06:00",
   "source": "live_api"
 }
