@@ -658099,12 +658099,24 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-06-29T13:01:21",
+      "value_in_mg_per_dl": 80.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-06-29T13:17:21",
       "value_in_mg_per_dl": 72.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-06-29T13:21:23",
+      "value_in_mg_per_dl": 79.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-06-29T13:18:07.749365-06:00",
+  "last_updated": "2026-06-29T13:22:14.710409-06:00",
   "source": "live_api"
 }
