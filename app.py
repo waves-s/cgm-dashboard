@@ -573,6 +573,24 @@ def load_renpho_df() -> pd.DataFrame:
         return st.session_state.renpho_df
     if not RENPHO_CACHE_FILE.exists():
         return pd.DataFrame()
+    # Mapping from cache key names → app column names
+    CACHE_TO_APP = {
+        "Weight":              "Weight_lb",
+        "BMI":                 "BMI",
+        "Body Fat":            "Body_Fat_pct",
+        "Fat-free Body Weight":"Fat_Free_Weight_lb",
+        "Subcutaneous Fat":    "Subcutaneous_Fat_pct",
+        "Visceral Fat":        "Visceral_Fat",
+        "Body Water":          "Body_Water_pct",
+        "Skeletal Muscle":     "Skeletal_Muscle_pct",
+        "Muscle Mass":         "Muscle_Mass_lb",
+        "Bone Mass":           "Bone_Mass_lb",
+        "Protein":             "Protein_pct",
+        "BMR":                 "BMR_kcal",
+        "Metabolic Age":       "Metabolic_Age",
+        "Timestamp":           "Timestamp",
+        "timestamp":           "Timestamp",
+    }
     try:
         with open(RENPHO_CACHE_FILE, "r") as f:
             data = json.load(f)
@@ -580,6 +598,13 @@ def load_renpho_df() -> pd.DataFrame:
         if not rows:
             return pd.DataFrame()
         df = pd.DataFrame(rows)
+        # Normalise timestamp column name
+        if "timestamp" in df.columns and "Timestamp" not in df.columns:
+            df = df.rename(columns={"timestamp": "Timestamp"})
+        # Rename cache keys to app column names
+        rename_map = {k: v for k, v in CACHE_TO_APP.items() if k in df.columns and k != v}
+        if rename_map:
+            df = df.rename(columns=rename_map)
         df["Timestamp"] = pd.to_datetime(df["Timestamp"], errors="coerce")
         df = df.dropna(subset=["Timestamp"]).sort_values("Timestamp").reset_index(drop=True)
         for col in RENPHO_METRIC_KEYS:
