@@ -1822,6 +1822,12 @@ with tab_stats:
 
 # ─── Renpho Body Composition Tab ────────────────────────────────────────────────
 with tab_renpho:
+    # Force-clear stale renpho_df from session state if it has bad BMI values
+    # (This handles the case where an old cached version had BMI=333)
+    if st.session_state.renpho_df is not None:
+        _cached = st.session_state.renpho_df
+        if "BMI" in _cached.columns and (_cached["BMI"] > 80).any():
+            st.session_state.renpho_df = None  # force reload
     # Pull the latest renpho_cache.json from GitHub on every render
     # so the app always has the most up-to-date data (avoids stale cached files)
     pull_renpho_from_github()
