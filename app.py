@@ -494,6 +494,45 @@ def commit_cache_to_github(df: pd.DataFrame) -> tuple[bool, str]:
 # ─── Renpho Cache Helpers ─────────────────────────────────────────────────────
 RENPHO_GITHUB_PATH = "renpho_cache.json"
 
+
+def pull_renpho_from_github() -> bool:
+    """
+    Download the latest renpho_cache.json from GitHub and overwrite the local file.
+    Called at app startup so the app always has the freshest Renpho data.
+    Returns True if the local file was updated, False otherwise.
+    """
+    try:
+        gh_token = st.secrets.get("github", {}).get("pat") or st.secrets.get("GH_PAT", "")
+        headers = {}
+        if gh_token:
+            headers["Authorization"] = f"token {gh_token}"
+        raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/{RENPHO_GITHUB_PATH}"
+        resp = requests.get(raw_url, headers=headers, timeout=30)
+        if resp.status_code == 200:
+            try:
+                new_data = resp.json()
+            except Exception:
+                return False  # malformed JSON — don't overwrite local
+            new_count = len(new_data.get("readings", []))
+            old_count = 0
+            if RENPHO_CACHE_FILE.exists():
+                try:
+                    with open(RENPHO_CACHE_FILE) as f:
+                        old_data = json.load(f)
+                    old_count = len(old_data.get("readings", []))
+                    if new_count <= old_count:
+                        return False  # already up to date
+                except Exception:
+                    pass
+            with open(RENPHO_CACHE_FILE, "w") as f:
+                json.dump(new_data, f, indent=2)
+            # Force reload of renpho_df on next access
+            st.session_state.renpho_df = None
+            return True
+        return False
+    except Exception:
+        return False
+
 # Renpho metric definitions: (column_name_in_df, display_label, unit)
 RENPHO_METRICS = [
     ("Weight_lb",           "Weight",             "lb"),
@@ -610,6 +649,9 @@ def load_renpho_df() -> pd.DataFrame:
         for col in RENPHO_METRIC_KEYS:
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors="coerce")
+        # Sanity-check: clamp obviously bad BMI values (must be 10–80)
+        if "BMI" in df.columns:
+            df.loc[~df["BMI"].between(10, 80), "BMI"] = pd.NA
         st.session_state.renpho_df = df
         return df
     except Exception:
@@ -1780,6 +1822,9 @@ with tab_stats:
 
 # ─── Renpho Body Composition Tab ────────────────────────────────────────────────
 with tab_renpho:
+    # Pull the latest renpho_cache.json from GitHub on every render
+    # so the app always has the most up-to-date data (avoids stale cached files)
+    pull_renpho_from_github()
     renpho_df = load_renpho_df()
 
     # ── Weight unit toggle ───────────────────────────────────────────────────────
