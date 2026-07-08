@@ -1825,6 +1825,7 @@ with tab_renpho:
     # so the app always has the most up-to-date data (avoids stale cached files)
     pull_renpho_from_github()
     renpho_df = load_renpho_df()
+    st.caption(f"🔧 App v{APP_VERSION} | Renpho rows: {len(renpho_df)} | BMI max: {renpho_df['BMI'].max():.1f if 'BMI' in renpho_df.columns and not renpho_df.empty else 0}")
 
     # ── Weight unit toggle ───────────────────────────────────────────────────────
     LB_TO_KG = 0.453592
