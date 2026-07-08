@@ -134,6 +134,7 @@ MG_TO_MMOL        = 0.0555
 CACHE_FILE        = Path(__file__).parent / "cache.json"
 RENPHO_CACHE_FILE = Path(__file__).parent / "renpho_cache.json"
 CALGARY_TZ        = ZoneInfo("America/Edmonton")  # Calgary / Mountain Time (MDT/MST)
+APP_VERSION       = "2026.07.08-bmi-fix"  # bump to force Streamlit Cloud redeploy
 
 # ─── Session State Initialization ─────────────────────────────────────────────
 for key, default in {
