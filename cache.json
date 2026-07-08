@@ -663725,8 +663725,110 @@
       "value_in_mg_per_dl": 77.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T03:40:54",
+      "value_in_mg_per_dl": 89.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T03:45:56",
+      "value_in_mg_per_dl": 88.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T03:50:55",
+      "value_in_mg_per_dl": 87.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T03:55:43",
+      "value_in_mg_per_dl": 86.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:00:43",
+      "value_in_mg_per_dl": 83.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:05:44",
+      "value_in_mg_per_dl": 81.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:10:54",
+      "value_in_mg_per_dl": 82.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:15:43",
+      "value_in_mg_per_dl": 80.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:20:43",
+      "value_in_mg_per_dl": 78.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:25:44",
+      "value_in_mg_per_dl": 80.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:30:44",
+      "value_in_mg_per_dl": 80.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:35:43",
+      "value_in_mg_per_dl": 79.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:40:44",
+      "value_in_mg_per_dl": 81.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:45:42",
+      "value_in_mg_per_dl": 84.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:50:42",
+      "value_in_mg_per_dl": 88.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T04:55:43",
+      "value_in_mg_per_dl": 82.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-08T05:16:44",
+      "value_in_mg_per_dl": 54.0,
+      "trend": "DOWN_FAST",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-07-08T03:14:05.983994-06:00",
+  "last_updated": "2026-07-08T05:17:20.413974-06:00",
   "source": "live_api"
 }
