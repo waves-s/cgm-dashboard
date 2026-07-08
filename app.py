@@ -514,16 +514,8 @@ def pull_renpho_from_github() -> bool:
             except Exception:
                 return False  # malformed JSON — don't overwrite local
             new_count = len(new_data.get("readings", []))
-            old_count = 0
-            if RENPHO_CACHE_FILE.exists():
-                try:
-                    with open(RENPHO_CACHE_FILE) as f:
-                        old_data = json.load(f)
-                    old_count = len(old_data.get("readings", []))
-                    if new_count <= old_count:
-                        return False  # already up to date
-                except Exception:
-                    pass
+            # Always overwrite local file with GitHub version to ensure
+            # stale/corrupt local copies (e.g. BMI=333 bug) are replaced
             with open(RENPHO_CACHE_FILE, "w") as f:
                 json.dump(new_data, f, indent=2)
             # Force reload of renpho_df on next access
