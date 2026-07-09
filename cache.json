@@ -666403,12 +666403,54 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-07-09T15:30:40",
+      "value_in_mg_per_dl": 116.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-09T15:35:39",
+      "value_in_mg_per_dl": 116.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-09T15:40:39",
+      "value_in_mg_per_dl": 117.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-07-09T15:42:41",
       "value_in_mg_per_dl": 116.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-07-09T15:45:41",
+      "value_in_mg_per_dl": 112.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-09T15:50:53",
+      "value_in_mg_per_dl": 110.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-09T15:55:40",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-09T16:16:39",
+      "value_in_mg_per_dl": 76.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-07-09T15:42:57.838106-06:00",
+  "last_updated": "2026-07-09T16:55:35.688948-06:00",
   "source": "live_api"
 }
