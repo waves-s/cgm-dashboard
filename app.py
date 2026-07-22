@@ -1821,9 +1821,10 @@ with tab_renpho:
         _cached = st.session_state.renpho_df
         if "BMI" in _cached.columns and (_cached["BMI"] > 80).any():
             st.session_state.renpho_df = None  # force reload
-    # Pull the latest renpho_cache.json from GitHub on every render
-    # so the app always has the most up-to-date data (avoids stale cached files)
-    pull_renpho_from_github()
+    # Pull the latest renpho_cache.json from GitHub on every render,
+    # but only if we don't already have fresh in-memory data (e.g. just after upload)
+    if st.session_state.renpho_df is None:
+        pull_renpho_from_github()
     renpho_df = load_renpho_df()
     _bmi_max = float(renpho_df["BMI"].max()) if ("BMI" in renpho_df.columns and not renpho_df.empty) else 0
     st.caption(f"🔧 App v{APP_VERSION} | Renpho rows: {len(renpho_df)} | BMI max: {_bmi_max:.1f}")
@@ -2087,11 +2088,14 @@ with tab_renpho:
             with st.spinner(f"Saving {len(merged_renpho):,} measurements to GitHub…"):
                 ok, msg = commit_renpho_to_github(merged_renpho)
             save_renpho_cache(merged_renpho)
-            st.session_state.renpho_df = None   # force reload on next render
+            # Store the freshly-merged df directly so the next render uses it
+            # without pulling from GitHub (avoids raw CDN cache lag)
+            st.session_state.renpho_df = merged_renpho
             if ok:
                 st.success(f"{msg} +{added:,} new measurements added ({len(merged_renpho):,} total).")
             else:
                 st.warning(f"⚠️ Could not commit to GitHub: {msg}\n\nData saved for this session only.")
+            st.rerun()  # re-render the page so charts pick up the new data
     elif renpho_upload is None:
         # Reset flag when uploader is cleared so a new file can be processed
         st.session_state.renpho_upload_done = False
