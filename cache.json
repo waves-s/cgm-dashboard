@@ -682855,12 +682855,120 @@
       "source": "live"
     },
     {
-      "timestamp": "2026-07-22T17:41:13",
+      "timestamp": "2026-07-22T17:26:12",
       "value_in_mg_per_dl": 114.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T17:31:11",
+      "value_in_mg_per_dl": 113.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T17:36:11",
+      "value_in_mg_per_dl": 112.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T17:41:13",
+      "value_in_mg_per_dl": 110.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T17:46:27",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T17:51:27",
+      "value_in_mg_per_dl": 109.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T17:56:21",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T18:01:20",
+      "value_in_mg_per_dl": 105.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T18:06:20",
+      "value_in_mg_per_dl": 106.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T18:11:11",
+      "value_in_mg_per_dl": 105.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T18:16:11",
+      "value_in_mg_per_dl": 105.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T18:21:11",
+      "value_in_mg_per_dl": 101.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T18:26:10",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T18:31:11",
+      "value_in_mg_per_dl": 101.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T18:36:12",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T18:41:11",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T18:46:12",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T18:51:10",
+      "value_in_mg_per_dl": 97.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-07-22T19:09:12",
+      "value_in_mg_per_dl": 91.0,
       "trend": "STABLE",
       "source": "live"
     }
   ],
-  "last_updated": "2026-07-22T17:41:38.706428-06:00",
+  "last_updated": "2026-07-22T19:11:00.562734-06:00",
   "source": "live_api"
 }
