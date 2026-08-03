@@ -699061,12 +699061,264 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-02T22:22:07",
+      "value_in_mg_per_dl": 90.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T22:27:21",
+      "value_in_mg_per_dl": 88.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T22:32:06",
+      "value_in_mg_per_dl": 86.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-02T22:35:06",
       "value_in_mg_per_dl": 86.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T22:37:19",
+      "value_in_mg_per_dl": 86.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T22:42:07",
+      "value_in_mg_per_dl": 85.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T22:47:20",
+      "value_in_mg_per_dl": 85.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T22:52:28",
+      "value_in_mg_per_dl": 89.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T22:57:06",
+      "value_in_mg_per_dl": 89.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:02:07",
+      "value_in_mg_per_dl": 87.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:07:20",
+      "value_in_mg_per_dl": 89.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:12:06",
+      "value_in_mg_per_dl": 88.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:17:06",
+      "value_in_mg_per_dl": 87.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:22:07",
+      "value_in_mg_per_dl": 84.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:27:26",
+      "value_in_mg_per_dl": 85.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:32:17",
+      "value_in_mg_per_dl": 85.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:37:06",
+      "value_in_mg_per_dl": 84.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:42:06",
+      "value_in_mg_per_dl": 85.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:47:05",
+      "value_in_mg_per_dl": 88.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:52:06",
+      "value_in_mg_per_dl": 90.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-02T23:57:07",
+      "value_in_mg_per_dl": 96.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:02:07",
+      "value_in_mg_per_dl": 101.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:07:17",
+      "value_in_mg_per_dl": 102.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:12:17",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:17:17",
+      "value_in_mg_per_dl": 109.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:22:17",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:27:17",
+      "value_in_mg_per_dl": 109.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:32:17",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:37:17",
+      "value_in_mg_per_dl": 106.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:42:17",
+      "value_in_mg_per_dl": 105.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:47:17",
+      "value_in_mg_per_dl": 104.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:52:17",
+      "value_in_mg_per_dl": 105.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T00:57:06",
+      "value_in_mg_per_dl": 107.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T01:02:06",
+      "value_in_mg_per_dl": 106.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T01:07:07",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T01:12:06",
+      "value_in_mg_per_dl": 110.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T01:17:06",
+      "value_in_mg_per_dl": 111.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T01:22:06",
+      "value_in_mg_per_dl": 112.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T01:27:06",
+      "value_in_mg_per_dl": 113.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T01:32:07",
+      "value_in_mg_per_dl": 115.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T01:37:06",
+      "value_in_mg_per_dl": 116.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T01:42:07",
+      "value_in_mg_per_dl": 118.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-03T02:00:07",
+      "value_in_mg_per_dl": 124.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-02T22:37:07.083931-06:00",
+  "last_updated": "2026-08-03T02:00:36.854613-06:00",
   "source": "live_api"
 }
