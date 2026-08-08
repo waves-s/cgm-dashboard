@@ -708601,12 +708601,42 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-08T09:32:01",
+      "value_in_mg_per_dl": 82.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-08T09:36:59",
+      "value_in_mg_per_dl": 82.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-08T09:42:00",
+      "value_in_mg_per_dl": 81.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-08T09:46:00",
       "value_in_mg_per_dl": 77.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-08T09:47:00",
+      "value_in_mg_per_dl": 80.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-08T10:05:00",
+      "value_in_mg_per_dl": 82.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-08T09:45:58.756542-06:00",
+  "last_updated": "2026-08-08T10:04:49.861599-06:00",
   "source": "live_api"
 }
