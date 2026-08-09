@@ -710665,12 +710665,42 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-09T11:37:00",
+      "value_in_mg_per_dl": 92.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-09T11:41:58",
+      "value_in_mg_per_dl": 92.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-09T11:46:58",
+      "value_in_mg_per_dl": 93.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-09T11:51:59",
-      "value_in_mg_per_dl": 95.0,
+      "value_in_mg_per_dl": 94.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-09T11:56:58",
+      "value_in_mg_per_dl": 96.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-09T12:17:58",
+      "value_in_mg_per_dl": 94.0,
       "trend": "STABLE",
       "source": "live"
     }
   ],
-  "last_updated": "2026-08-09T11:51:43.444000-06:00",
+  "last_updated": "2026-08-09T12:18:02.095140-06:00",
   "source": "live_api"
 }
