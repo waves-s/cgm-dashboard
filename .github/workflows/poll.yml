@@ -55,5 +55,8 @@ jobs:
             echo "No changes to cache.json, skipping commit."
           else
             git commit -m "chore: update glucose cache [skip poll]"
+            # Pull --rebase before push to handle concurrent pushes (e.g. from
+            # the dashboard app uploading renpho data at the same time)
+            git pull --rebase origin main || true
             git push
           fi
