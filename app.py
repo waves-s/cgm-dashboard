@@ -499,30 +499,57 @@ RENPHO_GITHUB_PATH = "renpho_cache.json"
 def pull_renpho_from_github() -> bool:
     """
     Download the latest renpho_cache.json from GitHub and overwrite the local file.
-    Called at app startup so the app always has the freshest Renpho data.
+    Uses the Git Data API (blob) instead of raw.githubusercontent.com to avoid
+    CDN caching lag (raw CDN can serve stale content for 5-30 min after a commit).
     Returns True if the local file was updated, False otherwise.
     """
     try:
         gh_token = st.secrets.get("github", {}).get("pat") or st.secrets.get("GH_PAT", "")
-        headers = {}
+        headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"}
         if gh_token:
             headers["Authorization"] = f"token {gh_token}"
-        raw_url = f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/{RENPHO_GITHUB_PATH}"
-        resp = requests.get(raw_url, headers=headers, timeout=30)
-        if resp.status_code == 200:
-            try:
-                new_data = resp.json()
-            except Exception:
-                return False  # malformed JSON — don't overwrite local
-            new_count = len(new_data.get("readings", []))
-            # Always overwrite local file with GitHub version to ensure
-            # stale/corrupt local copies (e.g. BMI=333 bug) are replaced
-            with open(RENPHO_CACHE_FILE, "w") as f:
-                json.dump(new_data, f, indent=2)
-            # Force reload of renpho_df on next access
-            st.session_state.renpho_df = None
-            return True
-        return False
+
+        # Step 1: Get the current blob SHA for renpho_cache.json via Contents API
+        # (always returns the live HEAD, no CDN caching)
+        api_url = f"https://api.github.com/repos/{GITHUB_REPO}/contents/{RENPHO_GITHUB_PATH}"
+        meta_resp = requests.get(api_url, headers=headers,
+                                 params={"ref": GITHUB_BRANCH}, timeout=15)
+        if meta_resp.status_code != 200:
+            return False
+        meta = meta_resp.json()
+        remote_sha = meta.get("sha", "")
+        remote_count_hint = meta.get("size", 0)  # file size in bytes
+
+        # Skip download if local file is already at this blob SHA
+        local_sha_file = RENPHO_CACHE_FILE.parent / ".renpho_blob_sha"
+        if local_sha_file.exists() and local_sha_file.read_text().strip() == remote_sha:
+            return False  # already up to date
+
+        # Step 2: Download the blob content directly (no CDN caching)
+        blob_url = meta.get("download_url") or \
+            f"https://raw.githubusercontent.com/{GITHUB_REPO}/{GITHUB_BRANCH}/{RENPHO_GITHUB_PATH}"
+        # Prefer the Git blob API for freshness
+        blob_sha = meta.get("sha", "")
+        blob_api_url = f"https://api.github.com/repos/{GITHUB_REPO}/git/blobs/{blob_sha}"
+        blob_resp = requests.get(blob_api_url, headers=headers, timeout=30)
+        if blob_resp.status_code != 200:
+            return False
+        import base64 as _b64
+        blob_data = blob_resp.json()
+        content_b64 = blob_data.get("content", "").replace("\n", "")
+        content_bytes = _b64.b64decode(content_b64)
+        try:
+            new_data = json.loads(content_bytes)
+        except Exception:
+            return False  # malformed JSON
+
+        # Write to disk and record the blob SHA so we skip re-downloading next time
+        with open(RENPHO_CACHE_FILE, "w") as f:
+            json.dump(new_data, f, indent=2)
+        local_sha_file.write_text(remote_sha)
+        # Force reload of renpho_df on next access
+        st.session_state.renpho_df = None
+        return True
     except Exception:
         return False
 
@@ -720,6 +747,10 @@ def commit_renpho_to_github(df: pd.DataFrame) -> tuple[bool, str]:
 
         put_resp = requests.put(api_url, headers=headers, json=payload, timeout=30)
         if put_resp.status_code in (200, 201):
+            # Clear the cached blob SHA so pull_renpho_from_github fetches fresh data next time
+            _sha_file = RENPHO_CACHE_FILE.parent / ".renpho_blob_sha"
+            if _sha_file.exists():
+                _sha_file.unlink()
             return True, f"✅ {len(readings):,} Renpho measurements committed to GitHub — visible to everyone."
         else:
             detail = put_resp.json().get("message", put_resp.text[:200])
