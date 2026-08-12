@@ -716179,12 +716179,30 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-12T11:21:55",
+      "value_in_mg_per_dl": 89.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-12T11:26:57",
+      "value_in_mg_per_dl": 90.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-12T11:33:56",
       "value_in_mg_per_dl": 95.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-12T11:45:01",
+      "value_in_mg_per_dl": 88.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-12T11:33:45.488491-06:00",
+  "last_updated": "2026-08-12T12:21:40.571816-06:00",
   "source": "live_api"
 }
