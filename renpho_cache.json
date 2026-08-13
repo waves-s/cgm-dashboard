@@ -17103,8 +17103,24 @@
       "Protein_pct": null,
       "BMR_kcal": null,
       "Metabolic_Age": null
+    },
+    {
+      "Timestamp": "2026-08-13T11:47:19",
+      "Weight_lb": 190.2,
+      "BMI": null,
+      "Body_Fat_pct": null,
+      "Fat_Free_Weight_lb": null,
+      "Subcutaneous_Fat_pct": null,
+      "Visceral_Fat": null,
+      "Body_Water_pct": null,
+      "Skeletal_Muscle_pct": null,
+      "Muscle_Mass_lb": null,
+      "Bone_Mass_lb": null,
+      "Protein_pct": null,
+      "BMR_kcal": null,
+      "Metabolic_Age": null
     }
   ],
-  "last_updated": "2026-08-12T12:21:25.155280-06:00",
+  "last_updated": "2026-08-13T11:23:16.674138-06:00",
   "source": "renpho_csv"
 }
