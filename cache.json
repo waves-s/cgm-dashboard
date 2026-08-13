@@ -717991,12 +717991,30 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-13T11:06:55",
+      "value_in_mg_per_dl": 92.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-13T11:11:55",
+      "value_in_mg_per_dl": 93.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-13T11:22:56",
       "value_in_mg_per_dl": 94.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-13T11:28:56",
+      "value_in_mg_per_dl": 102.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-13T11:23:32.359101-06:00",
+  "last_updated": "2026-08-13T11:28:42.160000-06:00",
   "source": "live_api"
 }
