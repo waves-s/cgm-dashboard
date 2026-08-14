@@ -720079,12 +720079,36 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-14T14:31:54",
+      "value_in_mg_per_dl": 97.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-14T14:36:56",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-14T14:41:55",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-14T14:46:55",
       "value_in_mg_per_dl": 100.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-14T15:04:55",
+      "value_in_mg_per_dl": 98.0,
       "trend": "STABLE",
       "source": "live"
     }
   ],
-  "last_updated": "2026-08-14T14:47:27.888671-06:00",
+  "last_updated": "2026-08-14T15:04:42.537684-06:00",
   "source": "live_api"
 }
