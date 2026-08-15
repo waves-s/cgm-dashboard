@@ -722233,12 +722233,30 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-15T16:37:02",
+      "value_in_mg_per_dl": 96.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-15T16:41:52",
+      "value_in_mg_per_dl": 99.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-15T16:50:53",
       "value_in_mg_per_dl": 101.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-15T17:00:52",
+      "value_in_mg_per_dl": 95.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-15T16:50:35.686401-06:00",
+  "last_updated": "2026-08-15T17:01:27.089785-06:00",
   "source": "live_api"
 }
