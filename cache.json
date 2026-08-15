@@ -721201,12 +721201,36 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-15T04:36:53",
+      "value_in_mg_per_dl": 100.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-15T04:41:52",
+      "value_in_mg_per_dl": 102.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-15T04:46:52",
+      "value_in_mg_per_dl": 102.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-15T04:52:53",
       "value_in_mg_per_dl": 103.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-15T05:05:52",
+      "value_in_mg_per_dl": 95.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-15T04:53:10.006783-06:00",
+  "last_updated": "2026-08-15T05:05:37.566962-06:00",
   "source": "live_api"
 }
