@@ -721777,12 +721777,36 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-15T11:16:54",
+      "value_in_mg_per_dl": 101.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-15T11:21:53",
+      "value_in_mg_per_dl": 101.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-15T11:26:53",
+      "value_in_mg_per_dl": 102.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-15T11:30:53",
       "value_in_mg_per_dl": 100.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-15T11:47:52",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-15T11:31:07.214882-06:00",
+  "last_updated": "2026-08-15T11:48:21.484319-06:00",
   "source": "live_api"
 }
