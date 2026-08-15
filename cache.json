@@ -721555,12 +721555,36 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-15T08:42:05",
+      "value_in_mg_per_dl": 105.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-15T08:47:08",
+      "value_in_mg_per_dl": 103.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-15T08:51:53",
+      "value_in_mg_per_dl": 103.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-15T08:56:53",
       "value_in_mg_per_dl": 102.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-15T09:13:53",
+      "value_in_mg_per_dl": 97.0,
       "trend": "STABLE",
       "source": "live"
     }
   ],
-  "last_updated": "2026-08-15T08:57:02.285759-06:00",
+  "last_updated": "2026-08-15T09:14:28.615248-06:00",
   "source": "live_api"
 }
