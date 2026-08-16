@@ -724225,12 +724225,42 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-16T17:17:08",
+      "value_in_mg_per_dl": 103.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T17:22:08",
+      "value_in_mg_per_dl": 104.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T17:27:08",
+      "value_in_mg_per_dl": 104.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T17:32:10",
+      "value_in_mg_per_dl": 106.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-16T17:32:51",
       "value_in_mg_per_dl": 108.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T17:48:51",
+      "value_in_mg_per_dl": 109.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-16T17:32:44.323502-06:00",
+  "last_updated": "2026-08-16T17:48:34.560749-06:00",
   "source": "live_api"
 }
