@@ -723589,12 +723589,30 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-16T09:36:52",
+      "value_in_mg_per_dl": 94.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T09:41:51",
+      "value_in_mg_per_dl": 98.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-16T09:48:52",
       "value_in_mg_per_dl": 97.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T10:00:53",
+      "value_in_mg_per_dl": 105.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-16T09:49:23.423377-06:00",
+  "last_updated": "2026-08-16T10:01:07.056470-06:00",
   "source": "live_api"
 }
