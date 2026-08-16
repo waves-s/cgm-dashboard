@@ -723187,12 +723187,42 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-16T05:01:52",
+      "value_in_mg_per_dl": 100.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T05:06:52",
+      "value_in_mg_per_dl": 102.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T05:11:52",
+      "value_in_mg_per_dl": 102.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T05:16:52",
+      "value_in_mg_per_dl": 100.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-16T05:17:52",
       "value_in_mg_per_dl": 103.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T05:37:53",
+      "value_in_mg_per_dl": 94.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-16T05:17:55.355755-06:00",
+  "last_updated": "2026-08-16T05:37:30.119887-06:00",
   "source": "live_api"
 }
