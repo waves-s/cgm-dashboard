@@ -723691,6 +723691,12 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-16T10:52:04",
+      "value_in_mg_per_dl": 106.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-16T10:53:04",
       "value_in_mg_per_dl": 105.0,
       "trend": "STABLE",
@@ -723701,8 +723707,14 @@
       "value_in_mg_per_dl": 104.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T11:12:51",
+      "value_in_mg_per_dl": 101.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-16T11:08:15.502550-06:00",
+  "last_updated": "2026-08-16T11:31:08.588264-06:00",
   "source": "live_api"
 }
