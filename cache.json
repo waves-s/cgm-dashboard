@@ -723949,12 +723949,42 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-16T14:01:51",
+      "value_in_mg_per_dl": 107.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T14:06:52",
+      "value_in_mg_per_dl": 106.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T14:11:51",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-16T14:14:52",
       "value_in_mg_per_dl": 108.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T14:16:52",
+      "value_in_mg_per_dl": 109.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T14:37:51",
+      "value_in_mg_per_dl": 114.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-16T14:14:50.216476-06:00",
+  "last_updated": "2026-08-16T14:38:23.650510-06:00",
   "source": "live_api"
 }
