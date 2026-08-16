@@ -723907,12 +723907,30 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-16T13:31:52",
+      "value_in_mg_per_dl": 106.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T13:36:52",
+      "value_in_mg_per_dl": 106.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-16T13:45:51",
       "value_in_mg_per_dl": 110.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-16T13:56:52",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-16T13:46:13.498811-06:00",
+  "last_updated": "2026-08-16T13:56:44.505255-06:00",
   "source": "live_api"
 }
