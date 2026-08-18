@@ -725869,12 +725869,42 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-18T16:46:34",
+      "value_in_mg_per_dl": 130.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-18T16:51:33",
+      "value_in_mg_per_dl": 137.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-18T16:56:38",
+      "value_in_mg_per_dl": 136.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-18T16:58:22",
       "value_in_mg_per_dl": 135.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-18T17:01:22",
+      "value_in_mg_per_dl": 148.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-18T17:19:22",
+      "value_in_mg_per_dl": 154.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-18T16:58:13.767086-06:00",
+  "last_updated": "2026-08-18T17:19:07.619727-06:00",
   "source": "live_api"
 }
