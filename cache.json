@@ -727441,12 +727441,42 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-19T12:56:22",
+      "value_in_mg_per_dl": 88.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-19T13:01:22",
+      "value_in_mg_per_dl": 96.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-19T13:06:23",
+      "value_in_mg_per_dl": 102.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-19T13:11:23",
-      "value_in_mg_per_dl": 110.0,
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-19T13:16:23",
+      "value_in_mg_per_dl": 116.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-19T13:35:23",
+      "value_in_mg_per_dl": 120.0,
       "trend": "STABLE",
       "source": "live"
     }
   ],
-  "last_updated": "2026-08-19T13:11:09.873271-06:00",
+  "last_updated": "2026-08-19T13:35:54.297178-06:00",
   "source": "live_api"
 }
