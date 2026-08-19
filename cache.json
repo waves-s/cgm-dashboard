@@ -727333,12 +727333,30 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-19T11:36:45",
+      "value_in_mg_per_dl": 83.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-19T11:41:22",
+      "value_in_mg_per_dl": 83.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-19T11:48:35",
       "value_in_mg_per_dl": 72.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-19T12:02:23",
+      "value_in_mg_per_dl": 77.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-19T11:48:11.666109-06:00",
+  "last_updated": "2026-08-19T12:02:11.974856-06:00",
   "source": "live_api"
 }
