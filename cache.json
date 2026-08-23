@@ -728057,8 +728057,14 @@
       "value_in_mg_per_dl": 123.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-23T16:07:46",
+      "value_in_mg_per_dl": 132.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-23T15:54:30.928147-06:00",
+  "last_updated": "2026-08-23T16:09:04.945669-06:00",
   "source": "live_api"
 }
