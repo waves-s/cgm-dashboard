@@ -728047,15 +728047,57 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-23T15:24:45",
+      "value_in_mg_per_dl": 110.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-23T15:29:46",
+      "value_in_mg_per_dl": 109.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-23T15:34:45",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-23T15:39:46",
+      "value_in_mg_per_dl": 114.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-23T15:44:45",
       "value_in_mg_per_dl": 116.0,
-      "trend": "STABLE",
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-23T15:49:45",
+      "value_in_mg_per_dl": 115.0,
+      "trend": "",
       "source": "live"
     },
     {
       "timestamp": "2026-08-23T15:54:45",
-      "value_in_mg_per_dl": 123.0,
-      "trend": "STABLE",
+      "value_in_mg_per_dl": 125.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-23T15:59:45",
+      "value_in_mg_per_dl": 125.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-23T16:04:45",
+      "value_in_mg_per_dl": 128.0,
+      "trend": "",
       "source": "live"
     },
     {
@@ -728063,8 +728105,26 @@
       "value_in_mg_per_dl": 132.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-23T16:09:58",
+      "value_in_mg_per_dl": 133.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-23T16:14:58",
+      "value_in_mg_per_dl": 132.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-23T16:34:46",
+      "value_in_mg_per_dl": 114.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-23T16:09:04.945669-06:00",
+  "last_updated": "2026-08-23T16:34:41.035235-06:00",
   "source": "live_api"
 }
