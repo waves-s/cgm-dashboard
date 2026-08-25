@@ -730123,12 +730123,30 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-08-24T17:34:44",
+      "value_in_mg_per_dl": 121.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-08-24T17:39:44",
+      "value_in_mg_per_dl": 123.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-08-24T17:46:43",
       "value_in_mg_per_dl": 130.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-08-24T17:59:42",
+      "value_in_mg_per_dl": 156.0,
+      "trend": "UP_SLOW",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-08-24T17:46:22.619609-06:00",
+  "last_updated": "2026-08-24T18:00:12.177850-06:00",
   "source": "live_api"
 }
