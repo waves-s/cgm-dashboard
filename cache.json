@@ -753533,8 +753533,14 @@
       "value_in_mg_per_dl": 100.0,
       "trend": "",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-09-15T15:27:44",
+      "value_in_mg_per_dl": 50.0,
+      "trend": "",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-09-15T15:40:10.501501-06:00",
+  "last_updated": "2026-09-15T17:41:26.320403-06:00",
   "source": "live_api"
 }
