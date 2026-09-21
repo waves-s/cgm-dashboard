@@ -756943,12 +756943,36 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-09-20T17:12:06",
+      "value_in_mg_per_dl": 88.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-09-20T17:17:05",
+      "value_in_mg_per_dl": 85.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-09-20T17:22:05",
+      "value_in_mg_per_dl": 82.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-09-20T17:28:05",
       "value_in_mg_per_dl": 79.0,
       "trend": "STABLE",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-09-20T17:39:05",
+      "value_in_mg_per_dl": 69.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-09-20T17:28:22.948528-06:00",
+  "last_updated": "2026-09-20T19:21:24.245390-06:00",
   "source": "live_api"
 }
