@@ -776923,12 +776923,72 @@
       "source": "live"
     },
     {
+      "timestamp": "2026-10-11T00:18:22",
+      "value_in_mg_per_dl": 91.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-10-11T00:23:22",
+      "value_in_mg_per_dl": 94.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-10-11T00:28:23",
+      "value_in_mg_per_dl": 94.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
       "timestamp": "2026-10-11T00:33:22",
-      "value_in_mg_per_dl": 95.0,
+      "value_in_mg_per_dl": 97.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-10-11T00:38:23",
+      "value_in_mg_per_dl": 102.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-10-11T00:43:22",
+      "value_in_mg_per_dl": 106.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-10-11T00:48:23",
+      "value_in_mg_per_dl": 108.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-10-11T00:53:23",
+      "value_in_mg_per_dl": 105.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-10-11T00:58:23",
+      "value_in_mg_per_dl": 102.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-10-11T01:03:23",
+      "value_in_mg_per_dl": 100.0,
+      "trend": "",
+      "source": "live"
+    },
+    {
+      "timestamp": "2026-10-11T01:21:22",
+      "value_in_mg_per_dl": 90.0,
       "trend": "STABLE",
       "source": "live"
     }
   ],
-  "last_updated": "2026-10-11T00:33:33.164147-06:00",
+  "last_updated": "2026-10-11T07:24:41.233956-06:00",
   "source": "live_api"
 }
