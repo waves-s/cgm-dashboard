@@ -803561,8 +803561,14 @@
       "value_in_mg_per_dl": 53.0,
       "trend": "",
       "source": "live"
+    },
+    {
+      "timestamp": "2026-11-27T20:14:39",
+      "value_in_mg_per_dl": 94.0,
+      "trend": "STABLE",
+      "source": "live"
     }
   ],
-  "last_updated": "2026-11-27T13:52:53.521320-06:00",
+  "last_updated": "2026-11-27T20:15:08.571950-06:00",
   "source": "live_api"
 }
